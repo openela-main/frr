@@ -1,0 +1,78 @@
+From 12f9f8472d0f8cfc026352906b8e5342df2846cc Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Tue, 27 Sep 2022 17:30:16 +0300
+Subject: [PATCH] bgpd: Do not send Deconfig/Shutdown message when restarting
+
+We might disable sending unconfig/shutdown notifications when
+Graceful-Restart is enabled and negotiated.
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgpd.c | 35 ++++++++++++++++++++++++++---------
+ 1 file changed, 26 insertions(+), 9 deletions(-)
+
+diff --git a/bgpd/bgpd.c b/bgpd/bgpd.c
+index 749e46ebe9d..ae1308db423 100644
+--- a/bgpd/bgpd.c
++++ b/bgpd/bgpd.c
+@@ -2755,11 +2755,34 @@ int peer_group_remote_as(struct bgp *bgp, const char *group_name, as_t *as,
+ 
+ void peer_notify_unconfig(struct peer *peer)
+ {
++	if (BGP_PEER_GRACEFUL_RESTART_CAPABLE(peer)) {
++		if (bgp_debug_neighbor_events(peer))
++			zlog_debug(
++				"%pBP configured Graceful-Restart, skipping unconfig notification",
++				peer);
++		return;
++	}
++
+ 	if (BGP_IS_VALID_STATE_FOR_NOTIF(peer->status))
+ 		bgp_notify_send(peer, BGP_NOTIFY_CEASE,
+ 				BGP_NOTIFY_CEASE_PEER_UNCONFIG);
+ }
+ 
++static void peer_notify_shutdown(struct peer *peer)
++{
++	if (BGP_PEER_GRACEFUL_RESTART_CAPABLE(peer)) {
++		if (bgp_debug_neighbor_events(peer))
++			zlog_debug(
++				"%pBP configured Graceful-Restart, skipping shutdown notification",
++				peer);
++		return;
++	}
++
++	if (BGP_IS_VALID_STATE_FOR_NOTIF(peer->status))
++		bgp_notify_send(peer, BGP_NOTIFY_CEASE,
++				BGP_NOTIFY_CEASE_ADMIN_SHUTDOWN);
++}
++
+ void peer_group_notify_unconfig(struct peer_group *group)
+ {
+ 	struct peer *peer, *other;
+@@ -3676,11 +3699,8 @@ int bgp_delete(struct bgp *bgp)
+ 	}
+ 
+ 	/* Inform peers we're going down. */
+-	for (ALL_LIST_ELEMENTS(bgp->peer, node, next, peer)) {
+-		if (BGP_IS_VALID_STATE_FOR_NOTIF(peer->status))
+-			bgp_notify_send(peer, BGP_NOTIFY_CEASE,
+-					BGP_NOTIFY_CEASE_ADMIN_SHUTDOWN);
+-	}
++	for (ALL_LIST_ELEMENTS(bgp->peer, node, next, peer))
++		peer_notify_shutdown(peer);
+ 
+ 	/* Delete static routes (networks). */
+ 	bgp_static_delete(bgp);
+@@ -8252,10 +8272,7 @@ void bgp_terminate(void)
+ 
+ 	for (ALL_LIST_ELEMENTS(bm->bgp, mnode, mnnode, bgp))
+ 		for (ALL_LIST_ELEMENTS(bgp->peer, node, nnode, peer))
+-			if (peer_established(peer) || peer->status == OpenSent
+-			    || peer->status == OpenConfirm)
+-				bgp_notify_send(peer, BGP_NOTIFY_CEASE,
+-						BGP_NOTIFY_CEASE_PEER_UNCONFIG);
++			peer_notify_unconfig(peer);
+ 
+ 	BGP_TIMER_OFF(bm->t_rmap_update);
+ 

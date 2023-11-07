@@ -1,0 +1,255 @@
+From edc3f63167fd95e4e70287743c9b252415c9336e Mon Sep 17 00:00:00 2001
+From: Philippe Guibert <philippe.guibert@6wind.com>
+Date: Thu, 7 Jul 2022 14:33:48 +0200
+Subject: [PATCH] bfdd: allow l3vrf bfd sessions without udp leaking
+
+Until now, when in vrf-lite mode, the BFD implementation
+creates a single UDP socket and relies on the following
+sysctl value to 1:
+
+echo 1 > /proc/sys/net/ipv4/udp_l3mdev_accept
+
+With this setting, the incoming BFD packets from a given
+vrf, would leak to the default vrf, and would match the
+UDP socket.
+
+The drawback of this solution is that udp packets received
+on a given vrf may leak to an other vrf. This may be a
+security concern.
+
+The commit addresses this issue by avoiding this leak
+mechanism. An UDP socket is created for each vrf, and each
+socket uses new setsockopt option: SO_REUSEADDR + SO_REUSEPORT.
+
+With this option, the incoming UDP packets are distributed on
+the available sockets. The impact of those options with l3mdev
+devices is unknown. It has been observed that this option is not
+needed, until the default vrf sockets are created.
+
+To ensure the BFD packets are correctly routed to the appropriate
+socket, a BPF filter has been put in place and attached to the
+sockets : SO_ATTACH_REUSEPORT_CBPF. This option adds a criterium
+to force the packet to choose a given socket. If initial criteria
+from the default distribution algorithm were not good, at least
+two sockets would be available, and the CBPF would force the
+selection to the same socket. This would come to the situation
+where an incoming packet would be processed on a different vrf.
+
+The bpf code is the following one:
+
+struct sock_filter code[] = {
+ { BPF_RET | BPF_K, 0, 0, 0 },
+};
+
+struct sock_fprog p = {
+          .len = sizeof(code)/sizeof(struct sock_filter),
+          .filter = code,
+};
+
+if (setsockopt(sd, SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF, &p, sizeof(p))) {
+        zlog_warn("unable to set SO_ATTACH_REUSEPORT_CBPF on socket: %s",
+                  strerror(errno));
+        return -1;
+}
+
+Some tests have been done with by creating vrf contexts, and by using
+the below vtysh configuration:
+
+ip route 2.2.2.2/32 10.126.0.2
+vrf vrf2
+ ip route 2.2.2.2/32 10.126.0.2
+!
+interface ntfp2
+ ip address 10.126.0.1/24
+!
+interface ntfp3 vrf vrf4
+ ip address 10.126.0.1/24
+!
+interface ntfp2 vrf vrf1
+ ip address 10.126.0.1/24
+!
+interface ntfp2.100 vrf vrf2
+ ip address 10.126.0.1/24
+!
+interface ntfp2.200 vrf vrf3
+ ip address 10.126.0.1/24
+!
+line vty
+!
+bfd
+ peer 10.126.0.2 vrf vrf2
+ !
+ peer 10.126.0.2 vrf vrf3
+ !
+ peer 10.126.0.2
+ !
+ peer 10.126.0.2 vrf vrf4
+ !
+ peer 2.2.2.2 multihop local-address 1.1.1.1
+ !
+ peer 2.2.2.2 multihop local-address 1.1.1.1 vrf vrf2
+  transmit-interval 1500
+  receive-interval 1500
+ !
+
+The results showed no issue related to packets received by
+the wrong vrf. Even changing the udp_l3mdev_accept flag to
+1 did not change the test results.
+
+Signed-off-by: Philippe Guibert <philippe.guibert@6wind.com>
+---
+ bfdd/bfd.c        | 66 +++++++++++++++++++++++------------------------
+ bfdd/bfd_packet.c | 45 ++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 34 deletions(-)
+
+diff --git a/bfdd/bfd.c b/bfdd/bfd.c
+index 483beb1b17c..a1619263588 100644
+--- a/bfdd/bfd.c
++++ b/bfdd/bfd.c
+@@ -1950,40 +1950,38 @@ static int bfd_vrf_enable(struct vrf *vrf)
+ 	if (bglobal.debug_zebra)
+ 		zlog_debug("VRF enable add %s id %u", vrf->name, vrf->vrf_id);
+ 
+-	if (vrf->vrf_id == VRF_DEFAULT ||
+-	    vrf_get_backend() == VRF_BACKEND_NETNS) {
+-		if (!bvrf->bg_shop)
+-			bvrf->bg_shop = bp_udp_shop(vrf);
+-		if (!bvrf->bg_mhop)
+-			bvrf->bg_mhop = bp_udp_mhop(vrf);
+-		if (!bvrf->bg_shop6)
+-			bvrf->bg_shop6 = bp_udp6_shop(vrf);
+-		if (!bvrf->bg_mhop6)
+-			bvrf->bg_mhop6 = bp_udp6_mhop(vrf);
+-		if (!bvrf->bg_echo)
+-			bvrf->bg_echo = bp_echo_socket(vrf);
+-		if (!bvrf->bg_echov6)
+-			bvrf->bg_echov6 = bp_echov6_socket(vrf);
+-
+-		if (!bvrf->bg_ev[0] && bvrf->bg_shop != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_shop, &bvrf->bg_ev[0]);
+-		if (!bvrf->bg_ev[1] && bvrf->bg_mhop != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_mhop, &bvrf->bg_ev[1]);
+-		if (!bvrf->bg_ev[2] && bvrf->bg_shop6 != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_shop6, &bvrf->bg_ev[2]);
+-		if (!bvrf->bg_ev[3] && bvrf->bg_mhop6 != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_mhop6, &bvrf->bg_ev[3]);
+-		if (!bvrf->bg_ev[4] && bvrf->bg_echo != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_echo, &bvrf->bg_ev[4]);
+-		if (!bvrf->bg_ev[5] && bvrf->bg_echov6 != -1)
+-			thread_add_read(master, bfd_recv_cb, bvrf,
+-					bvrf->bg_echov6, &bvrf->bg_ev[5]);
+-	}
++	if (!bvrf->bg_shop)
++		bvrf->bg_shop = bp_udp_shop(vrf);
++	if (!bvrf->bg_mhop)
++		bvrf->bg_mhop = bp_udp_mhop(vrf);
++	if (!bvrf->bg_shop6)
++		bvrf->bg_shop6 = bp_udp6_shop(vrf);
++	if (!bvrf->bg_mhop6)
++		bvrf->bg_mhop6 = bp_udp6_mhop(vrf);
++	if (!bvrf->bg_echo)
++		bvrf->bg_echo = bp_echo_socket(vrf);
++	if (!bvrf->bg_echov6)
++		bvrf->bg_echov6 = bp_echov6_socket(vrf);
++
++	if (!bvrf->bg_ev[0] && bvrf->bg_shop != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_shop,
++				&bvrf->bg_ev[0]);
++	if (!bvrf->bg_ev[1] && bvrf->bg_mhop != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_mhop,
++				&bvrf->bg_ev[1]);
++	if (!bvrf->bg_ev[2] && bvrf->bg_shop6 != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_shop6,
++				&bvrf->bg_ev[2]);
++	if (!bvrf->bg_ev[3] && bvrf->bg_mhop6 != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_mhop6,
++				&bvrf->bg_ev[3]);
++	if (!bvrf->bg_ev[4] && bvrf->bg_echo != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_echo,
++				&bvrf->bg_ev[4]);
++	if (!bvrf->bg_ev[5] && bvrf->bg_echov6 != -1)
++		thread_add_read(master, bfd_recv_cb, bvrf, bvrf->bg_echov6,
++				&bvrf->bg_ev[5]);
++
+ 	if (vrf->vrf_id != VRF_DEFAULT) {
+ 		bfdd_zclient_register(vrf->vrf_id);
+ 		bfdd_sessions_enable_vrf(vrf);
+diff --git a/bfdd/bfd_packet.c b/bfdd/bfd_packet.c
+index d34d6427628..054a9bfbf21 100644
+--- a/bfdd/bfd_packet.c
++++ b/bfdd/bfd_packet.c
+@@ -876,6 +876,14 @@ void bfd_recv_cb(struct thread *t)
+ 			 "no session found");
+ 		return;
+ 	}
++	/*
++	 * We may have a situation where received packet is on wrong vrf
++	 */
++	if (bfd && bfd->vrf && bfd->vrf != bvrf->vrf) {
++		cp_debug(is_mhop, &peer, &local, ifindex, vrfid,
++			 "wrong vrfid.");
++		return;
++	}
+ 
+ 	/* Ensure that existing good sessions are not overridden. */
+ 	if (!cp->discrs.remote_discr && bfd->ses_state != PTM_BFD_DOWN &&
+@@ -1208,10 +1216,41 @@ int bp_set_tos(int sd, uint8_t value)
+ 	return 0;
+ }
+ 
++static bool bp_set_reuse_addr(int sd)
++{
++	int one = 1;
++
++	if (setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) == -1) {
++		zlog_warn("set-reuse-addr: setsockopt(SO_REUSEADDR, %d): %s",
++			  one, strerror(errno));
++		return false;
++	}
++	return true;
++}
++
++static bool bp_set_reuse_port(int sd)
++{
++	int one = 1;
++
++	if (setsockopt(sd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) == -1) {
++		zlog_warn("set-reuse-port: setsockopt(SO_REUSEPORT, %d): %s",
++			  one, strerror(errno));
++		return false;
++	}
++	return true;
++}
++
++
+ static void bp_set_ipopts(int sd)
+ {
+ 	int rcvttl = BFD_RCV_TTL_VAL;
+ 
++	if (!bp_set_reuse_addr(sd))
++		zlog_fatal("set-reuse-addr: failed");
++
++	if (!bp_set_reuse_port(sd))
++		zlog_fatal("set-reuse-port: failed");
++
+ 	if (bp_set_ttl(sd, BFD_TTL_VAL) != 0)
+ 		zlog_fatal("set-ipopts: TTL configuration failed");
+ 
+@@ -1453,6 +1492,12 @@ static void bp_set_ipv6opts(int sd)
+ 	int ipv6_pktinfo = BFD_IPV6_PKT_INFO_VAL;
+ 	int ipv6_only = BFD_IPV6_ONLY_VAL;
+ 
++	if (!bp_set_reuse_addr(sd))
++		zlog_fatal("set-reuse-addr: failed");
++
++	if (!bp_set_reuse_port(sd))
++		zlog_fatal("set-reuse-port: failed");
++
+ 	if (bp_set_ttlv6(sd, BFD_TTL_VAL) == -1)
+ 		zlog_fatal(
+ 			"set-ipv6opts: setsockopt(IPV6_UNICAST_HOPS, %d): %s",

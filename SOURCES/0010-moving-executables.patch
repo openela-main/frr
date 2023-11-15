@@ -1,0 +1,40 @@
+diff --git a/tools/frr.service b/tools/frr.service
+index aa45f42..a3f0103 100644
+--- a/tools/frr.service
++++ b/tools/frr.service
+@@ -17,9 +17,9 @@ WatchdogSec=60s
+ RestartSec=5
+ Restart=on-abnormal
+ LimitNOFILE=1024
+-ExecStart=/usr/lib/frr/frrinit.sh start
+-ExecStop=/usr/lib/frr/frrinit.sh stop
+-ExecReload=/usr/lib/frr/frrinit.sh reload
++ExecStart=/usr/libexec/frr/frrinit.sh start
++ExecStop=/usr/libexec/frr/frrinit.sh stop
++ExecReload=/usr/libexec/frr/frrinit.sh reload
+ 
+ [Install]
+ WantedBy=multi-user.target
+diff --git a/tools/frrcommon.sh.in b/tools/frrcommon.sh.in
+index 9a144b2..a334d95 100644
+--- a/tools/frrcommon.sh.in
++++ b/tools/frrcommon.sh.in
+@@ -59,6 +59,9 @@ chownfrr() {
+ 	[ -n "$FRR_USER" ] && chown "$FRR_USER" "$1"
+ 	[ -n "$FRR_GROUP" ] && chgrp "$FRR_GROUP" "$1"
+ 	[ -n "$FRR_CONFIG_MODE" ] && chmod "$FRR_CONFIG_MODE" "$1"
++	if [ -d "$1" ]; then
++		chmod gu+x "$1"
++	fi
+ }
+ 
+ vtysh_b () {
+@@ -152,7 +155,7 @@ daemon_start() {
+ 	daemon_prep "$daemon" "$inst" || return 1
+ 	if test ! -d "$V_PATH"; then
+ 		mkdir -p "$V_PATH"
+-		chown frr "$V_PATH"
++		chownfrr "$V_PATH"
+ 	fi
+ 
+ 	eval wrap="\$${daemon}_wrap"

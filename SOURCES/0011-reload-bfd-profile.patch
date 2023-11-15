@@ -1,0 +1,77 @@
+diff --git a/tools/frr-reload.py b/tools/frr-reload.py
+index 9979c8b..1c24f90 100755
+--- a/tools/frr-reload.py
++++ b/tools/frr-reload.py
+@@ -785,6 +785,48 @@ def line_exist(lines, target_ctx_keys, target_line, exact_match=True):
+                     return True
+     return False
+ 
++def delete_bgp_bfd(lines_to_add, lines_to_del):
++    """
++    When 'neighbor <peer> bfd profile <profile>' is present without a
++    'neighbor <peer> bfd' line, FRR explicitily adds it to the running
++    configuration. When the new configuration drops the bfd profile
++    line, the user's intent is to delete any bfd configuration on the
++    peer. On reload, deleting the bfd profile line after the bfd line
++    will re-enable BFD with the default BFD profile. Move the bfd line
++    to the end, if it exists in the new configuration.
++
++    Example:
++
++     neighbor 10.0.0.1 bfd
++     neighbor 10.0.0.1 bfd profile bfd-profile-1
++
++     Move to end:
++     neighbor 10.0.0.1 bfd profile bfd-profile-1
++     ...
++
++     neighbor 10.0.0.1 bfd
++
++    """
++    lines_to_del_to_app = []
++    for (ctx_keys, line) in lines_to_del:
++        if (
++            ctx_keys[0].startswith("router bgp")
++            and line
++            and line.startswith("neighbor ")
++        ):
++            # 'no neighbor [peer] bfd>'
++            nb_bfd = "neighbor (\S+) .*bfd$"
++            re_nb_bfd = re.search(nb_bfd, line)
++            if re_nb_bfd:
++                lines_to_del_to_app.append((ctx_keys, line))
++
++    for (ctx_keys, line) in lines_to_del_to_app:
++        lines_to_del.remove((ctx_keys, line))
++        lines_to_del.append((ctx_keys, line))
++
++    return (lines_to_add, lines_to_del)
++
++
+ def check_for_exit_vrf(lines_to_add, lines_to_del):
+ 
+     # exit-vrf is a bit tricky.  If the new config is missing it but we
+@@ -1248,6 +1290,7 @@ def compare_context_objects(newconf, running):
+             for line in newconf_ctx.lines:
+                 lines_to_add.append((newconf_ctx_keys, line))
+ 
++    (lines_to_add, lines_to_del) = delete_bgp_bfd(lines_to_add, lines_to_del)
+     (lines_to_add, lines_to_del) = check_for_exit_vrf(lines_to_add, lines_to_del)
+     (lines_to_add, lines_to_del) = ignore_delete_re_add_lines(lines_to_add, lines_to_del)
+     (lines_to_add, lines_to_del) = ignore_unconfigurable_lines(lines_to_add, lines_to_del)
+diff --git a/bgpd/bgp_bfd.c b/bgpd/bgp_bfd.c
+index b566b0e..1bd6249 100644
+--- a/bgpd/bgp_bfd.c
++++ b/bgpd/bgp_bfd.c
+@@ -686,9 +686,9 @@ void bgp_bfd_peer_config_write(struct vty *vty, struct peer *peer, char *addr)
+ 
+ 	if (!CHECK_FLAG(bfd_info->flags, BFD_FLAG_PARAM_CFG)
+ 	    && (bfd_info->type == BFD_TYPE_NOT_CONFIGURED)) {
+-		vty_out(vty, " neighbor %s bfd", addr);
++		vty_out(vty, " neighbor %s bfd\n", addr);
+ 		if (bfd_info->profile[0])
+-			vty_out(vty, " profile %s", bfd_info->profile);
++			vty_out(vty, " neighbor %s bfd profile %s", addr, bfd_info->profile);
+ 		vty_out(vty, "\n");
+ 	}
+ 

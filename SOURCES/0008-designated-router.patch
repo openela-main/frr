@@ -1,0 +1,33 @@
+diff --git a/ospfd/ospf_vty.c b/ospfd/ospf_vty.c
+index 69a3e4587..57ef6029a 100644
+--- a/ospfd/ospf_vty.c
++++ b/ospfd/ospf_vty.c
+@@ -3737,6 +3737,28 @@ static void show_ip_ospf_interface_sub(struct vty *vty, struct ospf *ospf,
+ 				vty_out(vty,
+ 					"  No backup designated router on this network\n");
+ 		} else {
++			nbr = ospf_nbr_lookup_by_addr(oi->nbrs, &DR(oi));
++			if (nbr) {
++				if (use_json) {
++					json_object_string_add(
++						json_interface_sub, "drId",
++						inet_ntoa(nbr->router_id));
++					json_object_string_add(
++						json_interface_sub, "drAddress",
++						inet_ntoa(nbr->address.u
++								.prefix4));
++				} else {
++					vty_out(vty,
++						"  Designated Router (ID) %s",
++						inet_ntoa(nbr->router_id));
++					vty_out(vty,
++						" Interface Address %s\n",
++						inet_ntoa(nbr->address.u
++								.prefix4));
++				}
++			}
++			nbr = NULL;
++
+ 			nbr = ospf_nbr_lookup_by_addr(oi->nbrs, &BDR(oi));
+ 			if (nbr == NULL) {
+ 				if (!use_json)

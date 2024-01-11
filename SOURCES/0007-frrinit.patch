@@ -1,0 +1,31 @@
+diff --git a/tools/frrinit.sh.in b/tools/frrinit.sh.in
+index 539ab7d..d27d1be 100644
+--- a/tools/frrinit.sh.in
++++ b/tools/frrinit.sh.in
+@@ -43,7 +43,7 @@ fi
+ case "$1" in
+ start)
+ 	daemon_list daemons
+-	watchfrr_options="$watchfrr_options $daemons"
++	watchfrr_options="$daemons"
+ 	daemon_start watchfrr
+ 	;;
+ stop)
+@@ -57,7 +57,7 @@ restart|force-reload)
+ 	all_stop --reallyall
+ 
+ 	daemon_list daemons
+-	watchfrr_options="$watchfrr_options $daemons"
++	watchfrr_options="$daemons"
+ 	daemon_start watchfrr
+ 	;;
+ 
+@@ -87,7 +87,7 @@ reload)
+ 	# restart watchfrr to pick up added daemons.
+ 	# NB: This will NOT cause the other daemons to be restarted.
+ 	daemon_list daemons
+-	watchfrr_options="$watchfrr_options $daemons"
++	watchfrr_options="$daemons"
+ 	daemon_stop watchfrr && \
+ 		daemon_start watchfrr
+ 

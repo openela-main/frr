@@ -160,3 +160,47 @@ interface(`frr_admin',`
 		systemd_read_fifo_file_passwd_run($1)
 	')
 ')
+
+########################################
+## <summary>
+##  Read ifconfig_var_run_t files and link files
+## </summary>
+## <param name="domain">
+##  <summary>
+##      Domain allowed access.
+##  </summary>
+## </param>
+#
+ifndef(`sysnet_read_ifconfig_run',`
+  interface(`sysnet_read_ifconfig_run',`
+    gen_require(`
+      type ifconfig_var_run_t;
+    ')
+
+    manage_files_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+    list_dirs_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+    read_files_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+    read_lnk_files_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+  ')
+')
+
+########################################
+## <summary>
+##  Read unconfined_t files and dirs
+## </summary>
+## <param name="domain">
+##  <summary>
+##      Domain allowed access.
+##  </summary>
+## </param>
+#
+ifndef(`unconfined_read_files',`
+  interface(`unconfined_read_files',`
+    gen_require(`
+      type unconfined_t;
+    ')
+
+    allow $1 unconfined_t:file read_file_perms;
+    allow $1 unconfined_t:dir list_dir_perms;
+  ')
+')

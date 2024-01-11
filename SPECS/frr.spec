@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 7%{?checkout}%{?dist}.2
+Release: 13%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -53,7 +53,7 @@ Patch0010: 0010-moving-executables.patch
 Patch0011: 0011-reload-bfd-profile.patch
 Patch0012: 0012-graceful-restart.patch
 Patch0013: 0013-CVE-2022-37032.patch
-Patch0014: 0014-bfd-crash-in-MetalLB.patch
+Patch0014: 0014-bfd-profile-crash.patch
 Patch0015: 0015-CVE-2023-38802.patch
 
 %description
@@ -275,11 +275,23 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Wed Sep 06 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-7.2
-- Resolves: #2236708 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
+* Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13
+- Resolves: #2231000 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
 
-* Wed Aug 16 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-7.1
-- Resolves: #2231829 - BFD crash in FRR running in MetalLB
+* Wed Aug 23 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-12
+- Resolves: #2216911 - Adding missing sys_admin SELinux call
+
+* Mon Aug 21 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-11
+- Related: #2216911 - Adding unconfined_t type to access namespaces
+
+* Thu Aug 17 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-10
+- Related: #2226803 - Adding patch
+
+* Wed Aug 16 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-9
+- Resolves: #2226803 - BFD crash in FRR running in MetalLB
+
+* Fri Aug 11 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-8
+- Resolves: #2216911 - SELinux is preventing FRR-Zebra to access to network namespaces
 
 * Wed Nov 30 2022 Michal Ruprich <mruprich@redhat.com> - 7.5.1-7
 - Resolves: #2128737 - out-of-bounds read in the BGP daemon may lead to information disclosure or denial of service

@@ -31,9 +31,9 @@ files_pid_file(frr_var_run_t)
 #
 # frr local policy
 #
-allow frr_t self:capability { chown dac_override dac_read_search kill net_bind_service net_raw setgid setuid net_admin };
+allow frr_t self:capability { chown dac_override dac_read_search kill net_bind_service net_raw setgid setuid net_admin sys_admin };
 allow frr_t self:netlink_route_socket rw_netlink_socket_perms;
-allow frr_t self:packet_socket create;
+allow frr_t self:packet_socket create_socket_perms;
 allow frr_t self:process { setcap setpgid };
 allow frr_t self:rawip_socket create_socket_perms;
 allow frr_t self:tcp_socket { connect connected_stream_socket_perms };
@@ -95,6 +95,10 @@ domain_use_interactive_fds(frr_t)
 fs_read_nsfs_files(frr_t)
 
 sysnet_exec_ifconfig(frr_t)
+sysnet_read_ifconfig_run(frr_t)
+sysnet_watch_ifconfig_run(frr_t)
+
+ipsec_domtrans_mgmt(frr_t)
 
 userdom_read_admin_home_files(frr_t)
 

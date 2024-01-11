@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.3.1
-Release: 5%{?checkout}%{?dist}.2
+Release: 11%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -71,8 +71,11 @@ Patch0005: 0005-ospf-api.patch
 Patch0006: 0006-graceful-restart.patch
 Patch0007: 0007-cve-2022-37032.patch
 Patch0008: 0008-frr-non-root-user.patch
-Patch0009: 0009-bfd-not-working-in-vrf.patch
-Patch0010: 0010-CVE-2023-38802.patch
+Patch0009: 0009-CVE-2022-36440-40302.patch
+Patch0010: 0010-CVE-2022-43681.patch
+Patch0011: 0011-CVE-2022-40318.patch
+Patch0012: 0012-bfd-not-working-in-vrf.patch
+Patch0013: 0013-CVE-2023-38802.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -278,11 +281,26 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Wed Sep 06 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-5.2
-- Resolves: #2236711 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
+* Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11
+- Resolves: #2231001 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
 
-* Wed Jun 07 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-5.1
-- Resolves: #2212921 - BFD not working through VRF
+* Thu Aug 10 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-10
+- Related: #2216912 - adding sys_admin to capabilities
+
+* Tue Aug 08 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-9
+- Resolves: #2215346 - frr policy does not allow the execution of /usr/sbin/ipsec
+
+* Mon Aug 07 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-8
+- Resolves: #2216912 - SELinux is preventing FRR-Zebra to access to network namespaces
+
+* Wed Jun 07 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-7
+- Resolves: #2168855 - BFD not working through VRF
+
+* Tue May 23 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-6
+- Resolves: #2184870 - Reachable assertion in peek_for_as4_capability function
+- Resolves: #2196795 - denial of service by crafting a BGP OPEN message with an option of type 0xff
+- Resolves: #2196796 - denial of service by crafting a BGP OPEN message with an option of type 0xff
+- Resolves: #2196794 - out-of-bounds read exists in the BGP daemon of FRRouting
 
 * Mon Nov 28 2022 Michal Ruprich <mruprich@redhat.com> - 8.3.1-5
 - Resolves: #2147522 - It is not possible to run FRR as a non-root user

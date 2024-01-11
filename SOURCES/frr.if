@@ -160,3 +160,55 @@ interface(`frr_admin',`
 		systemd_read_fifo_file_passwd_run($1)
 	')
 ')
+
+########################################
+#
+# Interface compatibility blocks
+#
+# The following definitions ensure compatibility with distribution policy
+# versions that do not contain given interfaces (epel, or older Fedora
+# releases).
+# Each block tests for existence of given interface and defines it if needed.
+#
+
+######################################
+## <summary>
+##	Watch ifconfig_var_run_t directories
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+ifndef(`sysnet_watch_ifconfig_run',`
+	interface(`sysnet_watch_ifconfig_run',`
+		gen_require(`
+			type ifconfig_var_run_t;
+		')
+
+		watch_dirs_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+	')
+')
+
+########################################
+## <summary>
+##	Read ifconfig_var_run_t files and link files
+## </summary>
+## <param name="domain">
+##	<summary>
+##      Domain allowed access.
+##	</summary>
+## </param>
+#
+ifndef(`sysnet_read_ifconfig_run',`
+	interface(`sysnet_read_ifconfig_run',`
+		gen_require(`
+			type ifconfig_var_run_t;
+		')
+
+		list_dirs_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+		read_files_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+		read_lnk_files_pattern($1, ifconfig_var_run_t, ifconfig_var_run_t)
+	')
+')

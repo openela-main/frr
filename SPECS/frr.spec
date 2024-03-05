@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.3.1
-Release: 11%{?checkout}%{?dist}
+Release: 11%{?checkout}%{?dist}.2
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -76,6 +76,11 @@ Patch0010: 0010-CVE-2022-43681.patch
 Patch0011: 0011-CVE-2022-40318.patch
 Patch0012: 0012-bfd-not-working-in-vrf.patch
 Patch0013: 0013-CVE-2023-38802.patch
+Patch0014: 0014-max-ttl-reload.patch
+Patch0015: 0015-CVE-2023-47235.patch
+Patch0016: 0016-CVE-2023-47234.patch
+Patch0017: 0017-CVE-2023-38406.patch
+Patch0018: 0018-CVE-2023-38407.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -281,6 +286,21 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Thu Dec 21 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
+- Resolves: RHEL-17480 - Out of bounds read in bgpd/bgp_label.c
+
+* Thu Dec 21 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
+- Resolves: RHEL-17474 - Flowspec overflow in bgpd/bgp_flowspec.c
+
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
+- Resolves: RHEL-17471 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+
+* Mon Dec 18 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
+- Resolves: RHEL-17477 - crash from malformed EOR-containing BGP UPDATE message
+
+* Wed Oct 11 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.1
+- Resolves: RHEL-11665 - eBGP multihop peer flapping due to delta miscalculation of new configuration
+
 * Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11
 - Resolves: #2231001 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
 

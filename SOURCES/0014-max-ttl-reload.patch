@@ -1,0 +1,93 @@
+From 767aaa3a80489bfc4ff097f932fc347e3db25b89 Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Mon, 21 Aug 2023 00:01:42 +0300
+Subject: [PATCH] bgpd: Do not explicitly print MAXTTL value for ebgp-multihop
+ vty output
+
+1. Create /etc/frr/frr.conf
+```
+frr version 7.5
+frr defaults traditional
+hostname centos8.localdomain
+no ip forwarding
+no ipv6 forwarding
+service integrated-vtysh-config
+line vty
+router bgp 4250001000
+  neighbor 192.168.122.207 remote-as 65512
+  neighbor 192.168.122.207 ebgp-multihop
+```
+
+2. Start FRR
+`# systemctl start frr
+`
+3. Show running configuration. Note that FRR explicitly set and shows the default TTL (225)
+
+```
+Building configuration...
+
+Current configuration:
+!
+frr version 7.5
+frr defaults traditional
+hostname centos8.localdomain
+no ip forwarding
+no ipv6 forwarding
+service integrated-vtysh-config
+!
+router bgp 4250001000
+ neighbor 192.168.122.207 remote-as 65512
+ neighbor 192.168.122.207 ebgp-multihop 255
+!
+line vty
+!
+end
+```
+4. Copy initial frr.conf to frr.conf.new (no changes)
+`# cp /etc/frr/frr.conf /root/frr.conf.new
+`
+5. Run frr-reload.sh:
+
+```
+$ /usr/lib/frr/frr-reload.py --test  /root/frr.conf.new
+2023-08-20 20:15:48,050  INFO: Called via "Namespace(bindir='/usr/bin', confdir='/etc/frr', daemon='', debug=False, filename='/root/frr.conf.new', input=None, log_level='info', overwrite=False, pathspace=None, reload=False, rundir='/var/run/frr', stdout=False, test=True, vty_socket=None)"
+2023-08-20 20:15:48,050  INFO: Loading Config object from file /root/frr.conf.new
+2023-08-20 20:15:48,124  INFO: Loading Config object from vtysh show running
+
+Lines To Delete
+===============
+router bgp 4250001000
+ no neighbor 192.168.122.207 ebgp-multihop 255
+
+Lines To Add
+============
+router bgp 4250001000
+ neighbor 192.168.122.207 ebgp-multihop
+```
+
+Closes https://github.com/FRRouting/frr/issues/14242
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgp_vty.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/bgpd/bgp_vty.c b/bgpd/bgp_vty.c
+index be0fe4283747..c9a9255f3392 100644
+--- a/bgpd/bgp_vty.c
++++ b/bgpd/bgp_vty.c
+@@ -17735,8 +17735,12 @@ static void bgp_config_write_peer_global(struct vty *vty, struct bgp *bgp,
+ 	    && !(peer->gtsm_hops != BGP_GTSM_HOPS_DISABLED
+ 		 && peer->ttl == MAXTTL)) {
+ 		if (!peer_group_active(peer) || g_peer->ttl != peer->ttl) {
+-			vty_out(vty, " neighbor %s ebgp-multihop %d\n", addr,
+-				peer->ttl);
++			if (peer->ttl != MAXTTL)
++				vty_out(vty, " neighbor %s ebgp-multihop %d\n",
++					addr, peer->ttl);
++			else
++				vty_out(vty, " neighbor %s ebgp-multihop\n",
++					addr);
+ 		}
+ 	}
+ 

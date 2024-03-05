@@ -1,0 +1,48 @@
+From 0f9e4c4a36cf2b0dd585a7ef97acccb8eebdf7bd Mon Sep 17 00:00:00 2001
+From: Chirag Shah <chirag@nvidia.com>
+Date: Mon, 25 Jan 2021 11:44:56 -0800
+Subject: [PATCH] lib: fix a crash in plist update
+
+Problem:
+Prefix-list with mulitiple rules, an update to
+a rule/sequence with different prefix/prefixlen
+reset prefix-list next-base pointer to avoid
+having stale value.
+
+In some case the old next-bast's reference leads
+to an assert in tri (trie_install_fn ) add.
+
+bt:
+(object=0x55576a4c8a00, updptr=0x55576a4b97e0) at lib/plist.c:560
+(plist=0x55576a4a1770, pentry=0x55576a4c8a00) at lib/plist.c:585
+(ple=0x55576a4c8a00) at lib/plist.c:745
+(args=0x7fffe04beb50) at lib/filter_nb.c:1181
+
+Solution:
+Reset prefix-list next-base pointer whenver a
+sequence/rule is updated.
+
+Ticket:CM-33109
+Testing Done:
+
+Signed-off-by: Chirag Shah <chirag@nvidia.com>
+Signed-off-by: Rafael Zalamena <rzalamena@opensourcerouting.org>
+(cherry picked from commit f7f101156eb0e225f375f12cf4f863ebbe3fed03)
+---
+ lib/plist.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/plist.c b/lib/plist.c
+index 981e86e2a..c746d1946 100644
+--- a/lib/plist.c
++++ b/lib/plist.c
+@@ -684,6 +684,7 @@ void prefix_list_entry_update_start(struct prefix_list_entry *ple)
+ 	if (pl->head || pl->tail || pl->desc)
+ 		pl->master->recent = pl;
+ 
++	ple->next_best = NULL;
+ 	ple->installed = false;
+ }
+ 
+-- 
+2.41.0

@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 13%{?checkout}%{?dist}
+Release: 13%{?checkout}%{?dist}.4
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -55,6 +55,13 @@ Patch0012: 0012-graceful-restart.patch
 Patch0013: 0013-CVE-2022-37032.patch
 Patch0014: 0014-bfd-profile-crash.patch
 Patch0015: 0015-CVE-2023-38802.patch
+Patch0016: 0016-max-ttl-reload.patch
+Patch0017: 0017-fix-crash-in-plist-update.patch
+Patch0018: 0018-CVE-2023-38406.patch
+Patch0019: 0019-CVE-2023-38407.patch
+Patch0020: 0020-CVE-2023-47234.patch
+Patch0021: 0021-CVE-2023-47235.patch
+Patch0022: 0022-dynamic-netlink-buffer.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -275,6 +282,30 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Fri Feb 09 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.4
+- Resolves: RHEL-24697 - Zebra not fetching host routes
+
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
+- Resolves: RHEL-17529 - crash from malformed EOR-containing BGP UPDATE message
+
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
+- Resolves: RHEL-17535 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
+- Resolves: RHEL-17547 - Out of bounds read in bgpd/bgp_label.c
+
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
+- Resolves: RHEL-17541 - Flowspec overflow in bgpd/bgp_flowspec.c
+
+* Wed Oct 25 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.2
+- Related: RHEL-13873 - Fixing test results in the test database
+
+* Tue Oct 24 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.2
+- Resolves: RHEL-13873 - crash in plist update
+
+* Wed Oct 11 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.1
+- Resolves: RHEL-11671 - eBGP multihop peer flapping due to delta miscalculation of new configuration
+
 * Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13
 - Resolves: #2231000 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
 

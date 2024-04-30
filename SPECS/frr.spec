@@ -6,8 +6,8 @@
 %bcond_without selinux
 
 Name: frr
-Version: 8.3.1
-Release: 11%{?checkout}%{?dist}.2
+Version: 8.5.3
+Release: 4%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -67,20 +67,10 @@ Patch0000: 0000-remove-babeld-and-ldpd.patch
 Patch0002: 0002-enable-openssl.patch
 Patch0003: 0003-disable-eigrp-crypto.patch
 Patch0004: 0004-fips-mode.patch
-Patch0005: 0005-ospf-api.patch
-Patch0006: 0006-graceful-restart.patch
-Patch0007: 0007-cve-2022-37032.patch
-Patch0008: 0008-frr-non-root-user.patch
-Patch0009: 0009-CVE-2022-36440-40302.patch
-Patch0010: 0010-CVE-2022-43681.patch
-Patch0011: 0011-CVE-2022-40318.patch
-Patch0012: 0012-bfd-not-working-in-vrf.patch
-Patch0013: 0013-CVE-2023-38802.patch
-Patch0014: 0014-max-ttl-reload.patch
-Patch0015: 0015-CVE-2023-47235.patch
-Patch0016: 0016-CVE-2023-47234.patch
-Patch0017: 0017-CVE-2023-38406.patch
-Patch0018: 0018-CVE-2023-38407.patch
+Patch0005: 0005-CVE-2023-47235.patch
+Patch0006: 0006-CVE-2023-47234.patch
+Patch0007: 0007-CVE-2023-46752.patch
+Patch0008: 0008-CVE-2023-46753.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -286,23 +276,24 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Thu Dec 21 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
-- Resolves: RHEL-17480 - Out of bounds read in bgpd/bgp_label.c
+* Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 8.5.3-4
+- Resolves: RHEL-14825 - crafted BGP UPDATE message leading to a crash
 
-* Thu Dec 21 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
-- Resolves: RHEL-17474 - Flowspec overflow in bgpd/bgp_flowspec.c
+* Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 8.5.3-3
+- Resolves: RHEL-14822 - mishandled malformed data leading to a crash
 
-* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
-- Resolves: RHEL-17471 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+* Mon Dec 18 2023 Michal Ruprich <mruprich@redhat.com> - 8.5.3-2
+- Resolves: RHEL-15915 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+- Resolves: RHEL-15918 - crash from malformed EOR-containing BGP UPDATE message
 
-* Mon Dec 18 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.2
-- Resolves: RHEL-17477 - crash from malformed EOR-containing BGP UPDATE message
+* Thu Nov 23 2023 Michal Ruprich <mruprich@redhat.com> - 8.5.3-1
+- Resolves: RHEL-15291 - Rebase FRR to version 8.5.3 in RHEL9
 
-* Wed Oct 11 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11.1
-- Resolves: RHEL-11665 - eBGP multihop peer flapping due to delta miscalculation of new configuration
+* Fri Oct 13 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-12
+- Resolves: RHEL-3541 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
 
-* Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-11
-- Resolves: #2231001 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
+* Thu Sep 21 2023 Carlos Goncalves <cgoncalves@redhat.com> - 8.3.1-11
+- Resolves: RHEL-2263 - bgpd: Do not explicitly print MAXTTL value for ebgp-multihop vty output
 
 * Thu Aug 10 2023 Michal Ruprich <mruprich@redhat.com> - 8.3.1-10
 - Related: #2216912 - adding sys_admin to capabilities

@@ -111,5 +111,5 @@ index 53ae5b4..930307f 100644
  #include <openssl/hmac.h>
 +#include <openssl/fips.h>
  #endif
- 
+
  #include "openbsd-tree.h"

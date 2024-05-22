@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 13%{?checkout}%{?dist}.4
+Release: 22%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -54,14 +54,19 @@ Patch0011: 0011-reload-bfd-profile.patch
 Patch0012: 0012-graceful-restart.patch
 Patch0013: 0013-CVE-2022-37032.patch
 Patch0014: 0014-bfd-profile-crash.patch
-Patch0015: 0015-CVE-2023-38802.patch
-Patch0016: 0016-max-ttl-reload.patch
+Patch0015: 0015-max-ttl-reload.patch
+Patch0016: 0016-CVE-2023-38802.patch
 Patch0017: 0017-fix-crash-in-plist-update.patch
 Patch0018: 0018-CVE-2023-38406.patch
 Patch0019: 0019-CVE-2023-38407.patch
 Patch0020: 0020-CVE-2023-47234.patch
 Patch0021: 0021-CVE-2023-47235.patch
-Patch0022: 0022-dynamic-netlink-buffer.patch
+Patch0022: 0022-route-map-event.patch
+Patch0023: 0023-CVE-2023-46752.patch
+Patch0024: 0024-CVE-2023-46753.patch
+Patch0025: 0025-CVE-2023-31490.patch
+Patch0026: 0026-CVE-2023-41909.patch
+Patch0027: 0027-dynamic-netlink-buffer.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -282,32 +287,38 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Fri Feb 09 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.4
-- Resolves: RHEL-24697 - Zebra not fetching host routes
+* Wed Feb 07 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-22
+- Resolves: RHEL-22303 - Zebra not fetching host routes
 
-* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
-- Resolves: RHEL-17529 - crash from malformed EOR-containing BGP UPDATE message
+* Wed Feb 07 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-21
+- Resolves: RHEL-2216 - NULL pointer dereference
 
-* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
-- Resolves: RHEL-17535 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+* Wed Feb 07 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-20
+- Resolves: RHEL-4797 - missing length check in bgp_attr_psid_sub() can lead do DoS
 
-* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
-- Resolves: RHEL-17547 - Out of bounds read in bgpd/bgp_label.c
+* Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-19
+- Resolves: RHEL-14824 - crafted BGP UPDATE message leading to a crash
 
-* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.3
-- Resolves: RHEL-17541 - Flowspec overflow in bgpd/bgp_flowspec.c
+* Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-18
+- Resolves: RHEL-14821 - mishandled malformed data leading to a crash
 
-* Wed Oct 25 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.2
-- Related: RHEL-13873 - Fixing test results in the test database
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-17
+- Resolves: RHEL-6583 - Routes are not refreshed after changing the inbound route rules from deny to permit
 
-* Tue Oct 24 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.2
-- Resolves: RHEL-13873 - crash in plist update
+* Tue Dec 19 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-16
+- Resolves: RHEL-15916 - Flowspec overflow in bgpd/bgp_flowspec.c
+- Resolves: RHEL-15919 - Out of bounds read in bgpd/bgp_label.c
+- Resolves: RHEL-15869 - crash from specially crafted MP_UNREACH_NLRI-containing BGP UPDATE message
+- Resolves: RHEL-15868 - crash from malformed EOR-containing BGP UPDATE message
 
-* Wed Oct 11 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13.1
-- Resolves: RHEL-11671 - eBGP multihop peer flapping due to delta miscalculation of new configuration
+* Thu Oct 19 2023 Andreas Karis <akaris@redhat.com> - 7.5.1-15
+- Resolves: RHEL-12039 - crash in plist update
 
-* Wed Sep 13 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13
-- Resolves: #2231000 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
+* Fri Oct 13 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-14
+- Resolves: RHEL-6617 - Incorrect handling of a error in parsing of an invalid section of a BGP update can de-peer a router
+
+* Tue Oct 10 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-13
+- Resolves: RHEL-2263 - eBGP multihop peer flapping due to delta miscalculation of new configuration
 
 * Wed Aug 23 2023 Michal Ruprich <mruprich@redhat.com> - 7.5.1-12
 - Resolves: #2216911 - Adding missing sys_admin SELinux call

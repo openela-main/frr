@@ -1,0 +1,67 @@
+From 247a75d5c662893f6c08daf6ffbe82eb3073205a Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Tue, 5 Nov 2024 15:51:58 +0200
+Subject: [PATCH] bgpd: Reset BGP session only if it was a real BFD DOWN event
+
+Without this patch we always see a double-reset, e.g.:
+
+```
+2024/11/04 12:42:43.010 BGP: [VQY9X-CQZKG] bgp_peer_bfd_update_source: address [0.0.0.0->172.18.0.3] to [172.18.0.2->172.18.0.3]
+2024/11/04 12:42:43.010 BGP: [X8BD9-8RKN4] bgp_peer_bfd_update_source: interface none to eth0
+2024/11/04 12:42:43.010 BFD: [MSVDW-Y8Z5Q] ptm-del-dest: deregister peer [mhop:no peer:172.18.0.3 local:0.0.0.0 vrf:default cbit:0x00 minimum-ttl:255]
+2024/11/04 12:42:43.010 BFD: [NYF5K-SE3NS] ptm-del-session: [mhop:no peer:172.18.0.3 local:0.0.0.0 vrf:default] refcount=0
+2024/11/04 12:42:43.010 BFD: [NW21R-MRYNT] session-delete: mhop:no peer:172.18.0.3 local:0.0.0.0 vrf:default
+2024/11/04 12:42:43.010 BGP: [P3D3N-3277A] 172.18.0.3 [FSM] Timer (routeadv timer expire)
+2024/11/04 12:42:43.010 BFD: [YA0Q5-C0BPV] control-packet: no session found [mhop:no peer:172.18.0.3 local:172.18.0.2 port:11]
+2024/11/04 12:42:43.010 BFD: [MSVDW-Y8Z5Q] ptm-add-dest: register peer [mhop:no peer:172.18.0.3 local:172.18.0.2 vrf:default cbit:0x00 minimum-ttl:255]
+2024/11/04 12:42:43.011 BFD: [PSB4R-8T1TJ] session-new: mhop:no peer:172.18.0.3 local:172.18.0.2 vrf:default ifname:eth0
+2024/11/04 12:42:43.011 BGP: [Q4BCV-6FHZ5] zclient_bfd_session_update: 172.18.0.2/32 -> 172.18.0.3/32 (interface eth0) VRF default(0) (CPI bit no): Down
+2024/11/04 12:42:43.011 BGP: [MKVHZ-7MS3V] bfd_session_status_update: neighbor 172.18.0.3 vrf default(0) bfd state Up -> Down
+2024/11/04 12:42:43.011 BGP: [HZN6M-XRM1G] %NOTIFICATION: sent to neighbor 172.18.0.3 6/10 (Cease/BFD Down) 0 bytes
+2024/11/04 12:42:43.011 BGP: [QFMSE-NPSNN] zclient_bfd_session_update:   sessions updated: 1
+2024/11/04 12:42:43.011 BGP: [ZWCSR-M7FG9] 172.18.0.3 [FSM] BGP_Stop (Established->Clearing), fd 22
+```
+
+Reset is due to the source address change.
+
+With this patch, we reset the session only if it's a _REAL_ BFD down event, which
+means we trigger session reset if BFD session is established earlier than BGP.
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgp_bfd.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/bgpd/bgp_bfd.c b/bgpd/bgp_bfd.c
+index 11b074a..b3c5f84 100644
+--- a/bgpd/bgp_bfd.c
++++ b/bgpd/bgp_bfd.c
+@@ -70,12 +70,22 @@ static void bfd_session_status_update(struct bfd_session_params *bsp,
+ 		}
+ 		peer->last_reset = PEER_DOWN_BFD_DOWN;
+ 
+-		/* draft-ietf-idr-bfd-subcode */
+-		if (BGP_IS_VALID_STATE_FOR_NOTIF(peer->status))
+-			bgp_notify_send(peer, BGP_NOTIFY_CEASE,
+-					BGP_NOTIFY_CEASE_BFD_DOWN);
+-
+-		BGP_EVENT_ADD(peer, BGP_Stop);
++		/* Once the BFD session is UP, and later BGP session is UP,
++		 * BFD notices that peer->su_local changed, and BFD session goes down.
++		 * We should trigger BGP session reset if BFD session is UP
++		 * only when BGP session is UP already.
++		 * Otherwise, we end up resetting BGP session when BFD session is UP,
++		 * when the source address is changed, e.g. 0.0.0.0 -> 10.0.0.1.
++		 */
++		if (bss->last_event > peer->uptime) {
++			peer->last_reset = PEER_DOWN_BFD_DOWN;
++			/* rfc9384 */
++			if (BGP_IS_VALID_STATE_FOR_NOTIF(peer->status))
++				bgp_notify_send(peer, BGP_NOTIFY_CEASE,
++						BGP_NOTIFY_CEASE_BFD_DOWN);
++
++			BGP_EVENT_ADD(peer, BGP_Stop);
++		}
+ 	}
+ 
+ 	if (bss->state == BSS_UP && bss->previous_state != BSS_UP

@@ -1,0 +1,149 @@
+diff --git a/bgpd/bgp_fsm.c b/bgpd/bgp_fsm.c
+index 8f1fdea..df5fcaf 100644
+--- a/bgpd/bgp_fsm.c
++++ b/bgpd/bgp_fsm.c
+@@ -2907,19 +2907,22 @@ int bgp_neighbor_graceful_restart(struct peer *peer, int peer_gr_cmd)
+ 
+ 	peer_old_state = bgp_peer_gr_mode_get(peer);
+ 
+-	if (peer_old_state == PEER_INVALID) {
+-		zlog_debug("[BGP_GR] peer_old_state == Invalid state !");
++	if (BGP_DEBUG(graceful_restart, GRACEFUL_RESTART))
++		zlog_debug("%s [BGP_GR] peer_old_state: %d", __func__,
++			   peer_old_state);
++
++	if (peer_old_state == PEER_INVALID)
+ 		return BGP_ERR_GR_OPERATION_FAILED;
+-	}
+ 
+ 	peer_state = peer->PEER_GR_FSM[peer_old_state][peer_gr_cmd];
+ 	peer_new_state = peer_state.next_state;
+ 
+-	if (peer_new_state == PEER_INVALID) {
+-		zlog_debug(
+-			"[BGP_GR] Invalid bgp graceful restart command used !");
++	if (BGP_DEBUG(graceful_restart, GRACEFUL_RESTART))
++		zlog_debug("%s [BGP_GR] peer_new_state: %d", __func__,
++			   peer_new_state);
++
++	if (peer_new_state == PEER_INVALID)
+ 		return BGP_ERR_GR_INVALID_CMD;
+-	}
+ 
+ 	if (peer_new_state != peer_old_state) {
+ 		result = peer_state.action_fun(peer, peer_old_state,
+diff --git a/bgpd/bgp_vty.c b/bgpd/bgp_vty.c
+index 7bad770..dfd4f9f 100644
+--- a/bgpd/bgp_vty.c
++++ b/bgpd/bgp_vty.c
+@@ -3162,7 +3162,7 @@ DEFUN (bgp_neighbor_graceful_restart_set,
+ {
+ 	int idx_peer = 1;
+ 	struct peer *peer;
+-	int ret = BGP_GR_FAILURE;
++	int result = BGP_GR_FAILURE, ret = BGP_GR_SUCCESS;
+ 
+ 	VTY_BGP_GR_DEFINE_LOOP_VARIABLE;
+ 
+@@ -3174,16 +3174,21 @@ DEFUN (bgp_neighbor_graceful_restart_set,
+ 	if (!peer)
+ 		return CMD_WARNING_CONFIG_FAILED;
+ 
+-	ret = bgp_neighbor_graceful_restart(peer, PEER_GR_CMD);
+-
+-	VTY_BGP_GR_ROUTER_DETECT(bgp, peer, peer->bgp->peer);
+-	VTY_SEND_BGP_GR_CAPABILITY_TO_ZEBRA(peer->bgp, ret);
++	result = bgp_neighbor_graceful_restart(peer, PEER_GR_CMD);
++	if (result == BGP_GR_SUCCESS) {
++		VTY_BGP_GR_ROUTER_DETECT(bgp, peer, peer->bgp->peer);
++		VTY_SEND_BGP_GR_CAPABILITY_TO_ZEBRA(peer->bgp, ret);
++		vty_out(vty,
++			"Graceful restart configuration changed, reset this peer to take effect\n");
++	}
+ 
+ 	if (BGP_DEBUG(graceful_restart, GRACEFUL_RESTART))
+ 		zlog_debug(
+ 			"[BGP_GR] bgp_neighbor_graceful_restart_set_cmd : END ");
+-	vty_out(vty,
+-		"Graceful restart configuration changed, reset this peer to take effect\n");
++
++	if (ret != BGP_GR_SUCCESS)
++		vty_out(vty,
++			"As part of configuring graceful-restart, capability send to zebra failed\n");
+ 
+ 	return bgp_vty_return(vty, ret);
+ }
+@@ -3198,7 +3203,7 @@ DEFUN (no_bgp_neighbor_graceful_restart,
+       )
+ {
+ 	int idx_peer = 2;
+-	int ret = BGP_GR_FAILURE;
++	int result = BGP_GR_FAILURE, ret = BGP_GR_SUCCESS;
+ 	struct peer *peer;
+ 
+ 	VTY_BGP_GR_DEFINE_LOOP_VARIABLE;
+@@ -3211,16 +3216,21 @@ DEFUN (no_bgp_neighbor_graceful_restart,
+ 		zlog_debug(
+ 			"[BGP_GR] no_bgp_neighbor_graceful_restart_set_cmd : START ");
+ 
+-	ret = bgp_neighbor_graceful_restart(peer, NO_PEER_GR_CMD);
+-
+-	VTY_BGP_GR_ROUTER_DETECT(bgp, peer, peer->bgp->peer);
+-	VTY_SEND_BGP_GR_CAPABILITY_TO_ZEBRA(peer->bgp, ret);
++	result = bgp_neighbor_graceful_restart(peer, NO_PEER_GR_CMD);
++	if (ret == BGP_GR_SUCCESS) {
++		VTY_BGP_GR_ROUTER_DETECT(bgp, peer, peer->bgp->peer);
++		VTY_SEND_BGP_GR_CAPABILITY_TO_ZEBRA(peer->bgp, ret);
++		vty_out(vty,
++			"Graceful restart configuration changed, reset this peer to take effect\n");
++	}
+ 
+ 	if (BGP_DEBUG(graceful_restart, GRACEFUL_RESTART))
+ 		zlog_debug(
+ 			"[BGP_GR] no_bgp_neighbor_graceful_restart_set_cmd : END ");
+-	vty_out(vty,
+-		"Graceful restart configuration changed, reset this peer to take effect\n");
++
++	if (ret != BGP_GR_SUCCESS)
++		vty_out(vty,
++			"As part of configuring graceful-restart, capability send to zebra failed\n");
+ 
+ 	return bgp_vty_return(vty, ret);
+ }
+@@ -3310,7 +3320,7 @@ DEFUN (bgp_neighbor_graceful_restart_disable_set,
+ {
+ 	int idx_peer = 1;
+ 	struct peer *peer;
+-	int ret = BGP_GR_FAILURE;
++	int result = BGP_GR_FAILURE, ret = BGP_GR_SUCCESS;
+ 
+ 	VTY_BGP_GR_DEFINE_LOOP_VARIABLE;
+ 
+@@ -3349,7 +3359,7 @@ DEFUN (no_bgp_neighbor_graceful_restart_disable,
+       )
+ {
+ 	int idx_peer = 2;
+-	int ret = BGP_GR_FAILURE;
++	int result = BGP_GR_FAILURE, ret = BGP_GR_SUCCESS;
+ 	struct peer *peer;
+ 
+ 	VTY_BGP_GR_DEFINE_LOOP_VARIABLE;
+diff --git a/bgpd/bgpd.c b/bgpd/bgpd.c
+index 964349b..1db3e58 100644
+--- a/bgpd/bgpd.c
++++ b/bgpd/bgpd.c
+@@ -1320,11 +1320,11 @@ int bgp_peer_gr_init(struct peer *peer)
+ 	{
+ 	/*	PEER_GLOBAL_INHERIT Mode	*/
+ 	/* Event-> */ /* PEER_GR_CMD */		/* NO_PEER_GR_CMD */
+-		{ PEER_GR, bgp_peer_gr_action }, { PEER_INVALID, NULL },
++		{ PEER_GR, bgp_peer_gr_action }, { PEER_GLOBAL_INHERIT, NULL },
+ 	/* Event-> */ /* PEER_DISABLE_CMD */     /* NO_PEER_DISABLE_CMD */
+-		{ PEER_DISABLE, bgp_peer_gr_action}, { PEER_INVALID, NULL },
++		{ PEER_DISABLE, bgp_peer_gr_action }, { PEER_GLOBAL_INHERIT, NULL },
+ 	/* Event-> */ /* PEER_HELPER_cmd */     /* NO_PEER_HELPER_CMD */
+-		{ PEER_HELPER, bgp_peer_gr_action }, { PEER_INVALID, NULL }
++		{ PEER_HELPER, bgp_peer_gr_action }, { PEER_GLOBAL_INHERIT, NULL }
+ 	}
+ 	};
+ 	memcpy(&peer->PEER_GR_FSM, local_Peer_GR_FSM,

@@ -1,0 +1,285 @@
+From 59f5dd686a324f888602fa4a56f6da90e844103c Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Tue, 11 Jun 2024 11:40:40 +0300
+Subject: [PATCH 1/3] tests: Check if BFD notification is sent and session
+ remains in down state
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ .../r1/bfdd.conf                              |   4 +
+ .../r1/bgpd.conf                              |   2 +-
+ .../test_bgp_bfd_down_cease_notification.py   |   3 +
+ ...gp_bfd_down_cease_notification_shutdown.py | 122 ++++++++++++++++++
+ 4 files changed, 130 insertions(+), 1 deletion(-)
+ create mode 100644 tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification_shutdown.py
+
+diff --git a/tests/topotests/bgp_bfd_down_cease_notification/r1/bfdd.conf b/tests/topotests/bgp_bfd_down_cease_notification/r1/bfdd.conf
+index 0ae384eb53ca..1033b27c568d 100644
+--- a/tests/topotests/bgp_bfd_down_cease_notification/r1/bfdd.conf
++++ b/tests/topotests/bgp_bfd_down_cease_notification/r1/bfdd.conf
+@@ -1,5 +1,9 @@
+ bfd
++ profile r1
++ exit
++ !
+  peer 192.168.255.2 interface r1-eth0
++ profile r1
+  exit
+  !
+ exit
+diff --git a/tests/topotests/bgp_bfd_down_cease_notification/r1/bgpd.conf b/tests/topotests/bgp_bfd_down_cease_notification/r1/bgpd.conf
+index e855f75c20de..58a90d1a490c 100644
+--- a/tests/topotests/bgp_bfd_down_cease_notification/r1/bgpd.conf
++++ b/tests/topotests/bgp_bfd_down_cease_notification/r1/bgpd.conf
+@@ -3,7 +3,7 @@ router bgp 65001
+  no bgp ebgp-requires-policy
+  neighbor 192.168.255.2 remote-as external
+  neighbor 192.168.255.2 timers 3 10
+- neighbor 192.168.255.2 bfd
++ neighbor 192.168.255.2 bfd profile r1
+  address-family ipv4
+   redistribute connected
+  exit-address-family
+diff --git a/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification.py b/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification.py
+index 00142981c502..3be34300078b 100644
+--- a/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification.py
++++ b/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification.py
+@@ -89,6 +89,9 @@ def _bgp_bfd_down_notification():
+         expected = {
+             "192.168.255.1": {
+                 "lastNotificationReason": "Cease/BFD Down",
++                "peerBfdInfo": {
++                    "status": "Up",
++                },
+             }
+         }
+         return topotest.json_cmp(output, expected)
+diff --git a/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification_shutdown.py b/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification_shutdown.py
+new file mode 100644
+index 000000000000..5ffeed5033ae
+--- /dev/null
++++ b/tests/topotests/bgp_bfd_down_cease_notification/test_bgp_bfd_down_cease_notification_shutdown.py
+@@ -0,0 +1,122 @@
++#!/usr/bin/env python
++# SPDX-License-Identifier: ISC
++
++#
++# bgp_bfd_down_cease_notification_shutdown.py
++#
++# Copyright (c) 2024 by
++# Donatas Abraitis <donatas@opensourcerouting.org>
++#
++
++"""
++Check if Cease/BFD Down notification message is sent/received
++when the BFD is down (administratively).
++"""
++
++import os
++import sys
++import json
++import pytest
++import functools
++
++CWD = os.path.dirname(os.path.realpath(__file__))
++sys.path.append(os.path.join(CWD, "../"))
++
++# pylint: disable=C0413
++from lib import topotest
++from lib.topogen import Topogen, TopoRouter, get_topogen
++from lib.common_config import kill_router_daemons, step
++
++pytestmark = [pytest.mark.bfdd, pytest.mark.bgpd]
++
++
++def build_topo(tgen):
++    for routern in range(1, 3):
++        tgen.add_router("r{}".format(routern))
++
++    switch = tgen.add_switch("s1")
++    switch.add_link(tgen.gears["r1"])
++    switch.add_link(tgen.gears["r2"])
++
++
++def setup_module(mod):
++    tgen = Topogen(build_topo, mod.__name__)
++    tgen.start_topology()
++
++    router_list = tgen.routers()
++
++    for i, (rname, router) in enumerate(router_list.items(), 1):
++        router.load_config(
++            TopoRouter.RD_ZEBRA, os.path.join(CWD, "{}/zebra.conf".format(rname))
++        )
++        router.load_config(
++            TopoRouter.RD_BGP, os.path.join(CWD, "{}/bgpd.conf".format(rname))
++        )
++        router.load_config(
++            TopoRouter.RD_BFD, os.path.join(CWD, "{}/bfdd.conf".format(rname))
++        )
++
++    tgen.start_router()
++
++
++def teardown_module(mod):
++    tgen = get_topogen()
++    tgen.stop_topology()
++
++
++def test_bgp_bfd_down_notification_shutdown():
++    tgen = get_topogen()
++
++    if tgen.routers_have_failure():
++        pytest.skip(tgen.errors)
++
++    r1 = tgen.gears["r1"]
++    r2 = tgen.gears["r2"]
++
++    def _bgp_converge():
++        output = json.loads(r2.vtysh_cmd("show ip bgp neighbor 192.168.255.1 json"))
++        expected = {
++            "192.168.255.1": {
++                "bgpState": "Established",
++                "addressFamilyInfo": {"ipv4Unicast": {"acceptedPrefixCounter": 2}},
++                "peerBfdInfo": {"status": "Up"},
++            }
++        }
++        return topotest.json_cmp(output, expected)
++
++    def _bgp_bfd_down_notification():
++        output = json.loads(r2.vtysh_cmd("show ip bgp neighbor 192.168.255.1 json"))
++        expected = {
++            "192.168.255.1": {
++                "lastNotificationReason": "Cease/BFD Down",
++                "lastNotificationHardReset": True,
++                "peerBfdInfo": {
++                    "status": "Down",
++                },
++            }
++        }
++        return topotest.json_cmp(output, expected)
++
++    step("Initial BGP converge")
++    test_func = functools.partial(_bgp_converge)
++    _, result = topotest.run_and_expect(test_func, None, count=30, wait=1)
++    assert result is None, "Failed to see BGP convergence on R2"
++
++    r1.vtysh_cmd(
++        """
++    configure
++     bfd
++      profile r1
++       shutdown
++    """
++    )
++
++    step("Check if we received Cease/BFD Down notification message")
++    test_func = functools.partial(_bgp_bfd_down_notification)
++    _, result = topotest.run_and_expect(test_func, None, count=30, wait=1)
++    assert result is None, "Failed to see BGP Cease/BFD Down notification message on R2"
++
++
++if __name__ == "__main__":
++    args = ["-s"] + sys.argv[1:]
++    sys.exit(pytest.main(args))
+
+From ae1f3a48513f51c540788a090b05c24750665f55 Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Tue, 11 Jun 2024 11:41:53 +0300
+Subject: [PATCH 2/3] bgpd: Keep last notification's state about hard reset
+
+When we receive a hard-reset notification, we always show it if it was a hard,
+or not.
+
+For sending side, we missed that. Let's display it too.
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgp_packet.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/bgpd/bgp_packet.c b/bgpd/bgp_packet.c
+index 3f38790cbda3..8a4453f12472 100644
+--- a/bgpd/bgp_packet.c
++++ b/bgpd/bgp_packet.c
+@@ -982,6 +982,7 @@ static void bgp_notify_send_internal(struct peer_connection *connection,
+ 		peer->notify.code = bgp_notify.code;
+ 		peer->notify.subcode = bgp_notify.subcode;
+ 		peer->notify.length = bgp_notify.length;
++		peer->notify.hard_reset = hard_reset;
+ 
+ 		if (bgp_notify.length && data) {
+ 			bgp_notify.data = XMALLOC(MTYPE_BGP_NOTIFICATION,
+
+From 1fb48f5d13faf4ec1e6d4c2cdded9ca2dcd6d609 Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Wed, 12 Jun 2024 08:39:48 +0300
+Subject: [PATCH 3/3] bgpd: Do not start BGP session if BFD profile is in
+ shutdown state
+
+If we do:
+
+```
+bfd
+ profile foo
+  shutdown
+```
+
+The session is dropped, but immediately established again because we don't
+have a proper check on BFD.
+
+If BFD is administratively shutdown, ignore starting the session.
+
+Fixes: https://github.com/FRRouting/frr/issues/16186
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgpd.c | 6 ++++++
+ lib/bfd.c   | 6 ++++++
+ lib/bfd.h   | 2 ++
+ 3 files changed, 14 insertions(+)
+
+diff --git a/bgpd/bgpd.c b/bgpd/bgpd.c
+index 81506f4410b1..869d2b455214 100644
+--- a/bgpd/bgpd.c
++++ b/bgpd/bgpd.c
+@@ -4507,6 +4507,12 @@ bool peer_active(struct peer *peer)
+ {
+ 	if (BGP_PEER_SU_UNSPEC(peer))
+ 		return false;
++
++	if (peer->bfd_config) {
++		if (bfd_session_is_down(peer->bfd_config->session))
++			return false;
++	}
++
+ 	if (peer->afc[AFI_IP][SAFI_UNICAST] || peer->afc[AFI_IP][SAFI_MULTICAST]
+ 	    || peer->afc[AFI_IP][SAFI_LABELED_UNICAST]
+ 	    || peer->afc[AFI_IP][SAFI_MPLS_VPN] || peer->afc[AFI_IP][SAFI_ENCAP]
+diff --git a/lib/bfd.c b/lib/bfd.c
+index 2222bb954737..4535fc123378 100644
+--- a/lib/bfd.c
++++ b/lib/bfd.c
+@@ -1334,3 +1334,9 @@ int bfd_nht_update(const struct prefix *match, const struct zapi_route *route)
+ 
+ 	return 0;
+ }
++
++bool bfd_session_is_down(const struct bfd_session_params *session)
++{
++	return session->bss.state == BSS_DOWN ||
++	       session->bss.state == BSS_ADMIN_DOWN;
++}
+diff --git a/lib/bfd.h b/lib/bfd.h
+index bfa5287340f2..48929a95642c 100644
+--- a/lib/bfd.h
++++ b/lib/bfd.h
+@@ -464,6 +464,8 @@ extern bool bfd_protocol_integration_shutting_down(void);
+ extern int bfd_nht_update(const struct prefix *match,
+ 			  const struct zapi_route *route);
+ 
++extern bool bfd_session_is_down(const struct bfd_session_params *session);
++
+ #ifdef __cplusplus
+ }
+ #endif

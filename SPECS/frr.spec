@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.5.3
-Release: 4%{?checkout}%{?dist}
+Release: 4%{?checkout}%{?dist}.1
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -71,6 +71,9 @@ Patch0005: 0005-CVE-2023-47235.patch
 Patch0006: 0006-CVE-2023-47234.patch
 Patch0007: 0007-CVE-2023-46752.patch
 Patch0008: 0008-CVE-2023-46753.patch
+Patch0009: 0009-bfd-bgp-shutdown-notification.patch
+Patch0010: 0010-bgp-bfd-drop-connection.patch
+Patch0011: 0011-bgp-graceful-restart-noop.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -276,6 +279,11 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Fri Feb 14 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-4.1
+- Resolves: RHEL-78365 - FRR gives false warning when Graceful Restart enabled
+- Resolves: RHEL-78357 - BGP with BFD has a dropped Connection before peering established
+- Resolves: RHEL-78319 - BFD status down in FRR does not bring down BGP session between peers
+
 * Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 8.5.3-4
 - Resolves: RHEL-14825 - crafted BGP UPDATE message leading to a crash
 

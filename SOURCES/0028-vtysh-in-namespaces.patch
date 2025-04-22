@@ -1,0 +1,96 @@
+From a91f5417d8e7188b61ddecd4224fbba0f0c61e78 Mon Sep 17 00:00:00 2001
+From: Donald Sharp <sharpd@nvidia.com>
+Date: Mon, 4 Oct 2021 20:32:25 -0400
+Subject: [PATCH] watchfrr: Allow an integrated config to work within a
+ namespace
+
+Since watchfrr invokes vtysh to gather the show run output and
+write the data, if we are operating inside of a namespace FRR
+must also pass this in.
+
+Yes. This seems hacky.  I don't fully understand why vtysh
+is invoked this way.
+
+New output:
+
+sharpd@eva:~/frr3$ sudo vtysh -N one
+
+Hello, this is FRRouting (version 8.1-dev).
+Copyright 1996-2005 Kunihiro Ishiguro, et al.
+
+eva# wr mem
+Note: this version of vtysh never writes vtysh.conf
+% Can't open configuration file /etc/frr/one/vtysh.conf due to 'No such file or directory'.
+Building Configuration...
+Integrated configuration saved to /etc/frr/one/frr.conf
+[OK]
+eva#
+
+Signed-off-by: Donald Sharp <sharpd@nvidia.com>
+---
+ watchfrr/watchfrr.c     | 8 ++++++++
+ watchfrr/watchfrr.h     | 6 ++++++
+ watchfrr/watchfrr_vty.c | 5 ++++-
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/watchfrr/watchfrr.c b/watchfrr/watchfrr.c
+index 40749e8fc262..b09d09245884 100644
+--- a/watchfrr/watchfrr.c
++++ b/watchfrr/watchfrr.c
+@@ -68,6 +68,7 @@ DEFINE_MTYPE_STATIC(WATCHFRR, WATCHFRR_DAEMON, "watchfrr daemon entry");
+ struct thread_master *master;
+ 
+ static bool watch_only = false;
++const char *pathspace;
+ 
+ typedef enum {
+ 	PHASE_NONE = 0,
+@@ -1513,8 +1514,15 @@ int main(int argc, char **argv)
+ 	else
+ 		unsetenv("FRR_PATHSPACE");
+ 
++	/*
++	 * when watchfrr_di.pathspace is read, if it is not specified
++	 * pathspace is NULL as expected
++	 */
++	pathspace = watchfrr_di.pathspace;
++
+ 	if (netns_en && !netns)
+ 		netns = watchfrr_di.pathspace;
++
+ 	if (netns_en && netns && netns[0])
+ 		netns_setup(netns);
+ 
+diff --git a/watchfrr/watchfrr.h b/watchfrr/watchfrr.h
+index 4df1bf74afb7..4987a932c03c 100644
+--- a/watchfrr/watchfrr.h
++++ b/watchfrr/watchfrr.h
+@@ -25,6 +25,12 @@
+ 
+ DECLARE_MGROUP(WATCHFRR)
+ 
++/*
++ * This is the name of the pathspace we are in `-N XXX`
++ * If the default then this is NULL
++ */
++extern const char *pathspace;
++
+ extern void watchfrr_vty_init(void);
+ 
+ extern pid_t integrated_write_pid;
+diff --git a/watchfrr/watchfrr_vty.c b/watchfrr/watchfrr_vty.c
+index eda4f5d516bf..1492ee37b600 100644
+--- a/watchfrr/watchfrr_vty.c
++++ b/watchfrr/watchfrr_vty.c
+@@ -105,7 +105,10 @@ DEFUN(config_write_integrated,
+ 
+ 	/* don't allow the user to pass parameters, we're root here!
+ 	 * should probably harden vtysh at some point too... */
+-	execl(VTYSH_BIN_PATH, "vtysh", "-w", NULL);
++	if (pathspace)
++		execl(VTYSH_BIN_PATH, "vtysh", "-N", pathspace, "-w", NULL);
++	else
++		execl(VTYSH_BIN_PATH, "vtysh", "-w", NULL);
+ 
+ 	/* unbuffered write; we just messed with stdout... */
+ 	char msg[512];

@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 22%{?checkout}%{?dist}
+Release: 23%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -67,6 +67,7 @@ Patch0024: 0024-CVE-2023-46753.patch
 Patch0025: 0025-CVE-2023-31490.patch
 Patch0026: 0026-CVE-2023-41909.patch
 Patch0027: 0027-dynamic-netlink-buffer.patch
+Patch0028: 0028-vtysh-in-namespaces.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -287,6 +288,9 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Fri Apr 04 2025 Michal Ruprich <mruprich@redhat.com> - 7.5.1-23
+- Resolves: RHEL-65250 - When using namespaces, integrated configs for frr fail to write
+
 * Wed Feb 07 2024 Michal Ruprich <mruprich@redhat.com> - 7.5.1-22
 - Resolves: RHEL-22303 - Zebra not fetching host routes
 

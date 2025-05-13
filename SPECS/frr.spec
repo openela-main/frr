@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.5.3
-Release: 4%{?checkout}%{?dist}.1
+Release: 7%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -279,10 +279,14 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Fri Feb 14 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-4.1
-- Resolves: RHEL-78365 - FRR gives false warning when Graceful Restart enabled
-- Resolves: RHEL-78357 - BGP with BFD has a dropped Connection before peering established
-- Resolves: RHEL-78319 - BFD status down in FRR does not bring down BGP session between peers
+* Fri Feb 14 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-7
+- Resolves: RHEL-68432 - FRR gives false warning when Graceful Restart enabled
+
+* Fri Feb 14 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-6
+- Resolves: RHEL-78354 - BGP with BFD has a dropped Connection before peering established
+
+* Tue Feb 11 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-5
+- Resolves: RHEL-78318 - BFD status down in FRR does not bring down BGP session between peers
 
 * Mon Feb 05 2024 Michal Ruprich <mruprich@redhat.com> - 8.5.3-4
 - Resolves: RHEL-14825 - crafted BGP UPDATE message leading to a crash

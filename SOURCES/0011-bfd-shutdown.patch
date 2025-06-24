@@ -249,7 +249,7 @@ index 81506f4410b1..869d2b455214 100644
  		return false;
 +
 +	if (peer->bfd_config) {
-+		if (bfd_session_is_down(peer->bfd_config->session))
++		if (peer_established(peer) && bfd_session_is_down(peer->bfd_config->session))
 +			return false;
 +	}
 +

@@ -1,0 +1,306 @@
+From 5eb7047e2798e56c89c650434d3c6e7dc7533328 Mon Sep 17 00:00:00 2001
+From: Donatas Abraitis <donatas@opensourcerouting.org>
+Date: Tue, 12 Nov 2024 13:09:09 +0200
+Subject: [PATCH 2/5] bgpd: Update source address for BFD session
+
+If BFD is down, we should try to detect the source automatically from the given
+interface.
+
+Signed-off-by: Donatas Abraitis <donatas@opensourcerouting.org>
+---
+ bgpd/bgp_bfd.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/bgpd/bgp_bfd.c b/bgpd/bgp_bfd.c
+index 88ffb68206ac..3a1459b8a557 100644
+--- a/bgpd/bgp_bfd.c
++++ b/bgpd/bgp_bfd.c
+@@ -26,6 +26,7 @@
+ #include "bgpd/bgp_debug.h"
+ #include "bgpd/bgp_vty.h"
+ #include "bgpd/bgp_packet.h"
++#include "bgpd/bgp_network.h"
+ 
+ DEFINE_MTYPE_STATIC(BGPD, BFD_CONFIG, "BFD configuration data");
+ 
+@@ -158,16 +159,33 @@ void bgp_peer_bfd_update_source(struct peer *p)
+ 		struct in_addr v4;
+ 		struct in6_addr v6;
+ 	} src, dst;
++	struct interface *ifp;
++	union sockunion addr;
+ 
+ 	/* Nothing to do for groups. */
+ 	if (CHECK_FLAG(p->sflags, PEER_STATUS_GROUP))
+ 		return;
+ 
+ 	/* Figure out the correct source to use. */
+-	if (CHECK_FLAG(p->flags, PEER_FLAG_UPDATE_SOURCE) && p->update_source)
+-		source = p->update_source;
+-	else
++	if (CHECK_FLAG(p->flags, PEER_FLAG_UPDATE_SOURCE)) {
++		if (p->update_source) {
++			source = p->update_source;
++		} else if (p->update_if) {
++			ifp = if_lookup_by_name(p->update_if, p->bgp->vrf_id);
++			if (ifp) {
++				sockunion_init(&addr);
++				if (bgp_update_address(ifp, &p->su, &addr)) {
++					if (BGP_DEBUG(bfd, BFD_LIB))
++						zlog_debug("%s: can't find the source address for interface %s",
++							   __func__, p->update_if);
++				}
++
++				source = &addr;
++			}
++		}
++	} else {
+ 		source = p->su_local;
++	}
+ 
+ 	/* Update peer's source/destination addresses. */
+ 	bfd_sess_addresses(session, &family, &src.v6, &dst.v6);
+
+From d6c8c23635873ca26cd6837d2a8e0ad360a734c6 Mon Sep 17 00:00:00 2001
+From: Donald Sharp <sharpd@nvidia.com>
+Date: Wed, 20 Nov 2024 16:07:34 -0500
+Subject: [PATCH 3/5] bgpd: Allow bfd to work if peer known but interface
+ address not yet
+
+If bgp is coming up and bgp has not received the interface address yet
+but bgp has knowledge about a bfd peering, allow it to set the peering
+data appropriately.
+
+Signed-off-by: Donald Sharp <sharpd@nvidia.com>
+---
+ bgpd/bgp_bfd.c     |  8 ++++++--
+ bgpd/bgp_nexthop.c | 28 +++++++++++++++++-----------
+ 2 files changed, 23 insertions(+), 13 deletions(-)
+
+diff --git a/bgpd/bgp_bfd.c b/bgpd/bgp_bfd.c
+index 3a1459b8a557..b3221853bbad 100644
+--- a/bgpd/bgp_bfd.c
++++ b/bgpd/bgp_bfd.c
+@@ -151,8 +151,8 @@ void bgp_peer_config_apply(struct peer *p, struct peer_group *pg)
+ 
+ void bgp_peer_bfd_update_source(struct peer *p)
+ {
+-	struct bfd_session_params *session = p->bfd_config->session;
+-	const union sockunion *source;
++	struct bfd_session_params *session;
++	const union sockunion *source = NULL;
+ 	bool changed = false;
+ 	int family;
+ 	union {
+@@ -162,6 +162,10 @@ void bgp_peer_bfd_update_source(struct peer *p)
+ 	struct interface *ifp;
+ 	union sockunion addr;
+ 
++	if (!p->bfd_config)
++		return;
++
++	session = p->bfd_config->session;
+ 	/* Nothing to do for groups. */
+ 	if (CHECK_FLAG(p->sflags, PEER_STATUS_GROUP))
+ 		return;
+diff --git a/bgpd/bgp_nexthop.c b/bgpd/bgp_nexthop.c
+index 77e2603..c85f50d 100644
+--- a/bgpd/bgp_nexthop.c
++++ b/bgpd/bgp_nexthop.c
+@@ -46,6 +46,7 @@
+ #include "bgpd/bgp_fsm.h"
+ #include "bgpd/bgp_vty.h"
+ #include "bgpd/bgp_rd.h"
++#include "bgpd/bgp_bfd.h"
+ 
+ DEFINE_MTYPE_STATIC(BGPD, MARTIAN_STRING, "BGP Martian Addr Intf String");
+ 
+@@ -427,17 +428,6 @@ void bgp_connected_add(struct bgp *bgp, struct connected *ifc)
+ 			bgp_dest_set_bgp_connected_ref_info(dest, bc);
+ 		}
+ 
+-		for (ALL_LIST_ELEMENTS(bgp->peer, node, nnode, peer)) {
+-			if (peer->conf_if
+-			    && (strcmp(peer->conf_if, ifc->ifp->name) == 0)
+-			    && !peer_established(peer)
+-			    && !CHECK_FLAG(peer->flags,
+-					   PEER_FLAG_IFPEER_V6ONLY)) {
+-				if (peer_active(peer))
+-					BGP_EVENT_ADD(peer, BGP_Stop);
+-				BGP_EVENT_ADD(peer, BGP_Start);
+-			}
+-		}
+ 	} else if (addr->family == AF_INET6) {
+ 		apply_mask_ipv6((struct prefix_ipv6 *)&p);
+ 
+@@ -461,6 +451,21 @@ void bgp_connected_add(struct bgp *bgp, struct connected *ifc)
+ 			bgp_dest_set_bgp_connected_ref_info(dest, bc);
+ 		}
+ 	}
++
++	/*
++	 * Iterate over all the peers and attempt to set the bfd session
++	 * data and if it's a bgp unnumbered get her flowing if necessary
++	 */
++	for (ALL_LIST_ELEMENTS(bgp->peer, node, nnode, peer)) {
++		bgp_peer_bfd_update_source(peer);
++		if (peer->conf_if && (strcmp(peer->conf_if, ifc->ifp->name) == 0) &&
++		    !peer_established(peer) &&
++		    !CHECK_FLAG(peer->flags, PEER_FLAG_IFPEER_V6ONLY)) {
++			if (peer_active(peer))
++				BGP_EVENT_ADD(peer, BGP_Stop);
++			BGP_EVENT_ADD(peer, BGP_Start);
++		}
++	}
+ }
+ 
+ void bgp_connected_delete(struct bgp *bgp, struct connected *ifc)
+From 2c92346292badda2bad93c1a1188d4349e38cde0 Mon Sep 17 00:00:00 2001
+From: Donald Sharp <sharpd@nvidia.com>
+Date: Thu, 5 Dec 2024 10:16:03 -0500
+Subject: [PATCH 4/5] bgpd: When bgp notices a change to shared_network inform
+ bfd of it
+
+When bgp is started up and reads the config in *before* it has
+received interface addresses from zebra, shared_network can
+be set to false in this case.  Later on once bgp attempts to
+reconnect it will refigure out the shared_network again( because
+it has received the data from zebra now ).  In this case
+tell bfd about it.
+
+Signed-off-by: Donald Sharp <sharpd@nvidia.com>
+---
+ bgpd/bgp_zebra.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/bgpd/bgp_zebra.c b/bgpd/bgp_zebra.c
+index f9d096e6c643..e072e18c847f 100644
+--- a/bgpd/bgp_zebra.c
++++ b/bgpd/bgp_zebra.c
+@@ -728,6 +728,7 @@ bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
+ 	int ret = 0;
+ 	struct interface *ifp = NULL;
+ 	bool v6_ll_avail = true;
++	bool shared_network_original = peer->shared_network;
+ 
+ 	memset(nexthop, 0, sizeof(struct bgp_nexthop));
+ 
+@@ -892,6 +893,9 @@ bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
+ 			peer->shared_network = 0;
+ 	}
+ 
++	if (shared_network_original != peer->shared_network)
++		bgp_peer_bfd_update_source(peer);
++
+ /* KAME stack specific treatment.  */
+ #ifdef KAME
+ 	if (IN6_IS_ADDR_LINKLOCAL(&nexthop->v6_global)
+
+From c059cf388106f81040bdde3ff93a3b2cbd08523b Mon Sep 17 00:00:00 2001
+From: Louis Scalbert <louis.scalbert@6wind.com>
+Date: Wed, 22 Jan 2025 13:30:55 +0100
+Subject: [PATCH 5/5] bgpd: fix bfd with update-source in peer-group
+
+Fix BFD session not created when the peer is in update-group with the
+update-source option.
+
+Signed-off-by: Louis Scalbert <louis.scalbert@6wind.com>
+---
+ bgpd/bgp_bfd.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/bgpd/bgp_bfd.c b/bgpd/bgp_bfd.c
+index b3221853bbad..f8f06df49f14 100644
+--- a/bgpd/bgp_bfd.c
++++ b/bgpd/bgp_bfd.c
+@@ -114,6 +114,10 @@ void bgp_peer_config_apply(struct peer *p, struct peer_group *pg)
+ 	 */
+ 	gconfig = pg->conf;
+ 
++	if (CHECK_FLAG(gconfig->flags, PEER_FLAG_UPDATE_SOURCE) ||
++	    CHECK_FLAG(p->flags_override, PEER_FLAG_UPDATE_SOURCE))
++		bgp_peer_bfd_update_source(p);
++
+ 	/*
+ 	 * If using default control plane independent configuration,
+ 	 * then prefer group's (e.g. it means it wasn't manually configured).
+diff --git a/bfdd/bfd.c b/bfdd/bfd.c
+index 4367f25..b43ba32 100644
+--- a/bfdd/bfd.c
++++ b/bfdd/bfd.c
+@@ -1269,6 +1269,7 @@ void bfd_set_shutdown(struct bfd_session *bs, bool shutdown)
+ 			return;
+ 
+ 		SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
++		bs->local_diag = BD_ADMIN_DOWN;
+ 
+ 		/* Handle data plane shutdown case. */
+ 		if (bs->bdc) {
+diff --git a/bgpd/bgp_fsm.c b/bgpd/bgp_fsm.c
+index df5fcaf..01d61d4 100644
+--- a/bgpd/bgp_fsm.c
++++ b/bgpd/bgp_fsm.c
+@@ -1367,11 +1367,6 @@ enum bgp_fsm_state_progress bgp_stop(struct peer *peer)
+ 
+ 	peer->nsf_af_count = 0;
+ 
+-	/* deregister peer */
+-	if (peer->bfd_config
+-	    && peer->last_reset == PEER_DOWN_UPDATE_SOURCE_CHANGE)
+-		bfd_sess_uninstall(peer->bfd_config->session);
+-
+ 	if (peer_dynamic_neighbor_no_nsf(peer) &&
+ 	    !(CHECK_FLAG(peer->flags, PEER_FLAG_DELETE))) {
+ 		if (bgp_debug_neighbor_events(peer))
+@@ -1391,6 +1386,10 @@ enum bgp_fsm_state_progress bgp_stop(struct peer *peer)
+ 	if (peer_established(peer)) {
+ 		peer->dropped++;
+ 
++		if (peer->bfd_config && (peer->last_reset == PEER_DOWN_UPDATE_SOURCE_CHANGE ||
++				peer->last_reset == PEER_DOWN_MULTIHOP_CHANGE))
++		bfd_sess_uninstall(peer->bfd_config->session);
++
+ 		/* Notify BGP conditional advertisement process */
+ 		peer->advmap_table_change = true;
+ 
+diff --git a/bgpd/bgpd.c b/bgpd/bgpd.c
+index 374d9ee..352a77c 100644
+--- a/bgpd/bgpd.c
++++ b/bgpd/bgpd.c
+@@ -4253,7 +4253,10 @@ bool peer_active(struct peer *peer)
+ 		return false;
+ 
+ 	if (peer->bfd_config) {
+-		if (peer_established(peer) && bfd_session_is_down(peer->bfd_config->session))
++		if (bfd_session_is_admin_down(peer->bfd_config->session))
++			return false;
++		else if (peer_established(peer) &&
++				bfd_session_is_down(peer->bfd_config->session))
+ 			return false;
+ 	}
+ 
+diff --git a/lib/bfd.c b/lib/bfd.c
+index ee9d62d..7f897cd 100644
+--- a/lib/bfd.c
++++ b/lib/bfd.c
+@@ -1357,3 +1357,8 @@ bool bfd_session_is_down(const struct bfd_session_params *session)
+ 	return session->bss.state == BSS_DOWN ||
+ 	       session->bss.state == BSS_ADMIN_DOWN;
+ }
++
++bool bfd_session_is_admin_down(const struct bfd_session_params *session)
++{
++ return session->bss.state == BSS_ADMIN_DOWN;
++}
+diff --git a/lib/bfd.h b/lib/bfd.h
+index e1ba242..326767d 100644
+--- a/lib/bfd.h
++++ b/lib/bfd.h
+@@ -481,6 +481,7 @@ extern int bfd_nht_update(const struct prefix *match,
+ 			  const struct zapi_route *route);
+ 
+ extern bool bfd_session_is_down(const struct bfd_session_params *session);
++extern bool bfd_session_is_admin_down(const struct bfd_session_params *session);
+ 
+ #ifdef __cplusplus
+ }

@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.5.3
-Release: 7%{?checkout}%{?dist}
+Release: 9%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -71,9 +71,13 @@ Patch0005: 0005-CVE-2023-47235.patch
 Patch0006: 0006-CVE-2023-47234.patch
 Patch0007: 0007-CVE-2023-46752.patch
 Patch0008: 0008-CVE-2023-46753.patch
-Patch0009: 0009-bfd-bgp-shutdown-notification.patch
-Patch0010: 0010-bgp-bfd-drop-connection.patch
-Patch0011: 0011-bgp-graceful-restart-noop.patch
+Patch0009: 0009-bgp-graceful-restart-noop.patch
+Patch0010: 0010-bfd-double-reset.patch
+Patch0011: 0011-bfd-shutdown.patch
+Patch0012: 0012-print-log-to-stdout.patch
+Patch0013: 0013-bfd-bgp-recovery.patch
+# Turn off one fuzz test that fails with the new glibc
+Patch0014: 0014-isisd-fuzz-test.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -104,6 +108,10 @@ mkdir selinux
 cp -p %{SOURCE3} %{SOURCE4} %{SOURCE5} selinux
 
 %build
+# This is needed to pass a build with the new glibc
+# but this could affect the speed of inet_ntop calls
+# https://github.com/FRRouting/frr/issues/18575
+export CFLAGS="%{optflags} -DINET_NTOP_NO_OVERRIDE"
 autoreconf -ivf
 
 %configure \
@@ -279,6 +287,13 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Fri May 16 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-9
+- Resolves: RHEL-87730 - frr-k8s CI started failing using latest rpm, failures around BFD sessions
+- Resolves: RHEL-87731 - FRR bgp session not recovered due to incorect error no AF activated for peer
+
+* Thu Apr 03 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-8
+- Resolves: RHEL-85950 - FRR doesn't send logs to stdout when running as a daemon
+
 * Fri Feb 14 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-7
 - Resolves: RHEL-68432 - FRR gives false warning when Graceful Restart enabled
 

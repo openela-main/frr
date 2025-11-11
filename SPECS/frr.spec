@@ -9,7 +9,7 @@
 
 Name:           frr
 Version:        10.1
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Routing daemon
 License:        GPL-2.0-or-later AND ISC AND LGPL-2.0-or-later AND BSD-2-Clause AND BSD-3-Clause AND (GPL-2.0-or-later  OR ISC) AND MIT
 URL:            http://www.frrouting.org
@@ -31,6 +31,7 @@ Patch0007:      0007-CVE-2024-44070.patch
 Patch0008:      0008-bfd-bgp-shutdown-notification.patch
 Patch0009:      0009-bgp-bfd-drop-connection.patch
 Patch0010:      0010-frr-reload-escape-strings.patch
+Patch0011:      0011-bfd-peer-established.patch
 
 BuildRequires:  autoconf
 BuildRequires:  automake
@@ -281,6 +282,9 @@ rm tests/lib/*grpc*
 %endif
 
 %changelog
+* Wed Aug 06 2025 Michal Ruprich <mruprich@redhat.com> - 10.1-11
+- Resolves: RHEL-107464 - bgp session not recovered due to incorect error no AF activated for peer
+
 * Tue Feb 11 2025 Michal Ruprich <mruprich@redhat.com> - 10.1-10
 - RHEL-78638 - frr-reload.py suffers from unescaped regex sequences
 

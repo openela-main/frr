@@ -1,4 +1,4 @@
-From 003abd51eae1a575403d74eaec2fa935ca39fb1f Mon Sep 17 00:00:00 2001
+From 2eda8382daa3593abfd6a5af543aca1416b51121 Mon Sep 17 00:00:00 2001
 From: David Lamparter <equinox@opensourcerouting.org>
 Date: Wed, 22 Jan 2025 11:23:31 +0100
 Subject: [PATCH] lib: clean up nexthop hashing mess

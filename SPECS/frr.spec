@@ -78,7 +78,7 @@ Patch0012: 0012-print-log-to-stdout.patch
 Patch0013: 0013-bfd-bgp-recovery.patch
 # Turn off one fuzz test that fails with the new glibc
 Patch0014: 0014-isisd-fuzz-test.patch
-Patch0015: RHEL-114182.patch
+Patch0015: RHEL-114183.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -289,8 +289,8 @@ make check PYTHON=%{__python3}
 
 %changelog
 * Fri Sep 26 2025 RHEL Packaging Agent <jotnar@redhat.com> - 8.5.3-9.1
-- lib: clean up nexthop hashing mess
-- Resolves: RHEL-114182
+- Backported a fix for nexthop hashing mess
+- Resolves: RHEL-114183
 
 * Fri May 16 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-9
 - Resolves: RHEL-87730 - frr-k8s CI started failing using latest rpm, failures around BFD sessions

@@ -8,8 +8,8 @@
 %bcond selinux 1
 
 Name:           frr
-Version:        10.1
-Release:        11%{?dist}
+Version:        10.4.1
+Release:        2%{?dist}
 Summary:        Routing daemon
 License:        GPL-2.0-or-later AND ISC AND LGPL-2.0-or-later AND BSD-2-Clause AND BSD-3-Clause AND (GPL-2.0-or-later  OR ISC) AND MIT
 URL:            http://www.frrouting.org
@@ -20,18 +20,13 @@ Source2:        %{name}-sysusers.conf
 Source3:        frr.fc
 Source4:        frr.te
 Source5:        frr.if
+Source6:        remove-babeld-ldpd.sh
 
 Patch0000:      0000-remove-babeld-and-ldpd.patch
 Patch0002:      0002-enable-openssl.patch
 Patch0003:      0003-disable-eigrp-crypto.patch
 Patch0004:      0004-fips-mode.patch
 Patch0005:      0005-remove-grpc-test.patch
-Patch0006:      0006-noprefixroute-network-manager.patch
-Patch0007:      0007-CVE-2024-44070.patch
-Patch0008:      0008-bfd-bgp-shutdown-notification.patch
-Patch0009:      0009-bgp-bfd-drop-connection.patch
-Patch0010:      0010-frr-reload-escape-strings.patch
-Patch0011:      0011-bfd-peer-established.patch
 
 BuildRequires:  autoconf
 BuildRequires:  automake
@@ -115,6 +110,7 @@ cp -p %{SOURCE3} %{SOURCE4} %{SOURCE5} selinux
 sed -r -i 's/(AX_CXX_COMPILE_STDCXX\(\[)11(\])/\117\2/' configure.ac
 
 %build
+export CFLAGS="%{optflags} -DINET_NTOP_NO_OVERRIDE"
 autoreconf -ivf
 
 %configure \
@@ -156,8 +152,7 @@ bzip2 -9 selinux/%{name}.pp
 
 %install
 mkdir -p %{buildroot}%{_sysconfdir}/{frr,rc.d/init.d,sysconfig,logrotate.d,pam.d,default} \
-         %{buildroot}%{_localstatedir}/log/frr %{buildroot}%{_infodir} \
-         %{buildroot}%{_unitdir}
+         %{buildroot}%{_infodir} %{buildroot}%{_unitdir}
 
 mkdir -p -m 0755 %{buildroot}%{_libdir}/frr
 mkdir -p %{buildroot}%{_tmpfilesdir}
@@ -250,7 +245,6 @@ rm tests/lib/*grpc*
 %license COPYING
 %doc doc/mpls
 %dir %attr(750,frr,frr) %{_sysconfdir}/frr
-%dir %attr(755,frr,frr) %{_localstatedir}/log/frr
 %dir %attr(755,frr,frr) /run/frr
 %{_infodir}/*info*
 %{_mandir}/man1/frr.1*
@@ -282,6 +276,12 @@ rm tests/lib/*grpc*
 %endif
 
 %changelog
+* Fri Dec 19 2025 Michal Ruprich <mruprich@redhat.com> - 10.4.1-2
+- Resolves: RHEL-128146 - Files under /var are not properly created in image-mode
+
+* Mon Dec 08 2025 Michal Ruprich <mruprich@redhat.com> - 10.4.1-1
+- Resolves: RHEL-118620 - Rebase FRR in to version 10.4.1
+
 * Wed Aug 06 2025 Michal Ruprich <mruprich@redhat.com> - 10.1-11
 - Resolves: RHEL-107464 - bgp session not recovered due to incorect error no AF activated for peer
 

@@ -24,8 +24,8 @@ index 0b7af18..0533e24 100644
  	lib/log_vty.h \
 -	lib/md5.h \
  	lib/memory.h \
- 	lib/mgmt.pb-c.h \
  	lib/mgmt_be_client.h \
+ 	lib/mgmt_defines.h \
 @@ -191,7 +190,6 @@ pkginclude_HEADERS += \
  	lib/route_opaque.h \
  	lib/sbuf.h \

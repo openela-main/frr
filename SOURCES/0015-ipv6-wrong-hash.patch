@@ -1,4 +1,4 @@
-From 2eda8382daa3593abfd6a5af543aca1416b51121 Mon Sep 17 00:00:00 2001
+From 46e685d2f9cd1a359e0abd95b584f7cc3df9ae2c Mon Sep 17 00:00:00 2001
 From: David Lamparter <equinox@opensourcerouting.org>
 Date: Wed, 22 Jan 2025 11:23:31 +0100
 Subject: [PATCH] lib: clean up nexthop hashing mess
@@ -11,16 +11,17 @@ The reason this was done was to try to make it faster, but made a
 complex maze out of everything.  Time for a refactor.
 
 Signed-off-by: David Lamparter <equinox@opensourcerouting.org>
+(cherry picked from commit 001fcfa1dd9f7dc2639b4f5c7a52ab59cc425452)
 ---
  lib/nexthop.c |  87 ++++++-----------------------------------
  lib/nexthop.h | 104 +++++++++++++++++++++++++++++++++-----------------
  2 files changed, 80 insertions(+), 111 deletions(-)
 
 diff --git a/lib/nexthop.c b/lib/nexthop.c
-index 1eeed4a..fd1d1e9 100644
+index 98b05295b996..90931676e5de 100644
 --- a/lib/nexthop.c
 +++ b/lib/nexthop.c
-@@ -693,68 +693,30 @@ unsigned int nexthop_level(const struct nexthop *nexthop)
+@@ -746,68 +746,30 @@ unsigned int nexthop_level(const struct nexthop *nexthop)
  	return rv;
  }
  
@@ -101,7 +102,7 @@ index 1eeed4a..fd1d1e9 100644
  	}
  
  	if (nexthop->nh_srv6) {
-@@ -768,31 +730,6 @@ uint32_t nexthop_hash_quick(const struct nexthop *nexthop)
+@@ -842,31 +804,6 @@ uint32_t nexthop_hash_quick(const struct nexthop *nexthop)
  	return key;
  }
  
@@ -134,10 +135,10 @@ index 1eeed4a..fd1d1e9 100644
  			     const struct nexthop *nexthop,
  			     struct nexthop *rparent)
 diff --git a/lib/nexthop.h b/lib/nexthop.h
-index f35cc5e..9383799 100644
+index 02ea4d96f2df..12e6424f2774 100644
 --- a/lib/nexthop.h
 +++ b/lib/nexthop.h
-@@ -23,6 +23,7 @@
+@@ -8,6 +8,7 @@
  #ifndef _LIB_NEXTHOP_H
  #define _LIB_NEXTHOP_H
  
@@ -145,7 +146,7 @@ index f35cc5e..9383799 100644
  #include "prefix.h"
  #include "mpls.h"
  #include "vxlan.h"
-@@ -71,15 +72,48 @@ struct nexthop {
+@@ -56,15 +57,48 @@ struct nexthop {
  	struct nexthop *next;
  	struct nexthop *prev;
  
@@ -197,7 +198,7 @@ index f35cc5e..9383799 100644
  
  	uint16_t flags;
  #define NEXTHOP_FLAG_ACTIVE     (1 << 0) /* This nexthop is alive. */
-@@ -97,18 +131,15 @@ struct nexthop {
+@@ -82,18 +116,15 @@ struct nexthop {
  #define NEXTHOP_FLAG_EVPN       (1 << 8) /* nexthop is EVPN */
  #define NEXTHOP_FLAG_LINKDOWN   (1 << 9) /* is not removed on link down */
  
@@ -221,7 +222,7 @@ index f35cc5e..9383799 100644
  	/* Nexthops obtained by recursive resolution.
  	 *
  	 * If the nexthop struct needs to be resolved recursively,
-@@ -119,15 +150,9 @@ struct nexthop {
+@@ -104,15 +135,9 @@ struct nexthop {
  	/* Recursive parent */
  	struct nexthop *rparent;
  
@@ -237,7 +238,7 @@ index f35cc5e..9383799 100644
  	/* Count and index of corresponding backup nexthop(s) in a backup list;
  	 * only meaningful if the HAS_BACKUP flag is set.
  	 */
-@@ -153,6 +178,29 @@ struct nexthop {
+@@ -138,6 +163,29 @@ struct nexthop {
  	struct nexthop_srv6 *nh_srv6;
  };
  
@@ -267,7 +268,7 @@ index f35cc5e..9383799 100644
  /* Utility to append one nexthop to another. */
  #define NEXTHOP_APPEND(to, new)           \
  	do {                              \
-@@ -196,27 +244,11 @@ struct nexthop *nexthop_from_blackhole(enum blackhole_type bh_type,
+@@ -181,27 +229,11 @@ struct nexthop *nexthop_from_blackhole(enum blackhole_type bh_type,
  /*
   * Hash a nexthop. Suitable for use with hash tables.
   *
@@ -298,6 +299,3 @@ index f35cc5e..9383799 100644
  
  extern bool nexthop_same(const struct nexthop *nh1, const struct nexthop *nh2);
  extern bool nexthop_same_no_labels(const struct nexthop *nh1,
--- 
-2.47.3
-

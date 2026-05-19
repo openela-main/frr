@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.5.3
-Release: 9%{?checkout}%{?dist}.1
+Release: 12%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -78,7 +78,8 @@ Patch0012: 0012-print-log-to-stdout.patch
 Patch0013: 0013-bfd-bgp-recovery.patch
 # Turn off one fuzz test that fails with the new glibc
 Patch0014: 0014-isisd-fuzz-test.patch
-Patch0015: RHEL-114183.patch
+Patch0015: 0015-ipv6-wrong-hash.patch
+Patch0016: 0016-dont-ignore-kernel-route.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -152,8 +153,7 @@ bzip2 -9 selinux/%{name}.pp
 
 %install
 mkdir -p %{buildroot}/etc/{frr,rc.d/init.d,sysconfig,logrotate.d,pam.d,default} \
-         %{buildroot}/var/log/frr %{buildroot}%{_infodir} \
-         %{buildroot}%{_unitdir}
+         %{buildroot}%{_infodir} %{buildroot}%{_unitdir}
 
 mkdir -p -m 0755 %{buildroot}%{_libdir}/frr
 mkdir -p %{buildroot}%{_tmpfilesdir}
@@ -260,7 +260,6 @@ make check PYTHON=%{__python3}
 %license COPYING
 %doc doc/mpls
 %dir %attr(750,frr,frr) %{_sysconfdir}/frr
-%dir %attr(755,frr,frr) /var/log/frr
 %dir %attr(755,frr,frr) /run/frr
 %{_infodir}/*info*
 %{_mandir}/man*/*
@@ -288,9 +287,14 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
-* Fri Sep 26 2025 RHEL Packaging Agent <jotnar@redhat.com> - 8.5.3-9.1
-- Backported a fix for nexthop hashing mess
-- Resolves: RHEL-114183
+* Fri Jan 16 2026 Michal Ruprich <mruprich@redhat.com> - 8.5.3-12
+- Resolves: RHEL-137180 - Files under /var are not properly created in image-mode
+
+* Wed Oct 29 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-11
+- Resolves: RHEL-64427 - FRR ignores kernel routes from the system
+
+* Fri Sep 19 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-10
+- Resolves: RHEL-13756 - Source address set in FRR route-map not working with IPv6
 
 * Fri May 16 2025 Michal Ruprich <mruprich@redhat.com> - 8.5.3-9
 - Resolves: RHEL-87730 - frr-k8s CI started failing using latest rpm, failures around BFD sessions

@@ -8,8 +8,8 @@
 %bcond selinux 1
 
 Name:           frr
-Version:        10.4.1
-Release:        2%{?dist}
+Version:        10.4.4
+Release:        1%{?dist}
 Summary:        Routing daemon
 License:        GPL-2.0-or-later AND ISC AND LGPL-2.0-or-later AND BSD-2-Clause AND BSD-3-Clause AND (GPL-2.0-or-later  OR ISC) AND MIT
 URL:            http://www.frrouting.org
@@ -276,6 +276,9 @@ rm tests/lib/*grpc*
 %endif
 
 %changelog
+* Wed May 20 2026 Michal Ruprich <mruprich@redhat.com> - 10.4.4-1
+- Resolves: RHEL-166035 - Bump FRR to 10.4.3 to fix EVPN problems
+
 * Fri Dec 19 2025 Michal Ruprich <mruprich@redhat.com> - 10.4.1-2
 - Resolves: RHEL-128146 - Files under /var are not properly created in image-mode
 

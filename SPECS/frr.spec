@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 23%{?checkout}%{?dist}
+Release: 24%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -68,6 +68,8 @@ Patch0025: 0025-CVE-2023-31490.patch
 Patch0026: 0026-CVE-2023-41909.patch
 Patch0027: 0027-dynamic-netlink-buffer.patch
 Patch0028: 0028-vtysh-in-namespaces.patch
+# https://github.com/FRRouting/frr/commit/0e6882bc72c0278988a47b2f0f73b7a91099a25c
+Patch0029: RHEL-174676.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -288,6 +290,10 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Wed May 20 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 7.5.1-24
+- Fix off-by-one error in FlowSpec operator array bounds checking (CVE-2026-37457)
+- Resolves: RHEL-174676
+
 * Fri Apr 04 2025 Michal Ruprich <mruprich@redhat.com> - 7.5.1-23
 - Resolves: RHEL-65250 - When using namespaces, integrated configs for frr fail to write
 

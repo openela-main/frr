@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 8.5.3
-Release: 12%{?checkout}%{?dist}
+Release: 13%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -80,6 +80,7 @@ Patch0013: 0013-bfd-bgp-recovery.patch
 Patch0014: 0014-isisd-fuzz-test.patch
 Patch0015: 0015-ipv6-wrong-hash.patch
 Patch0016: 0016-dont-ignore-kernel-route.patch
+Patch0017: 0017-fix-CVE-2026-37457.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -287,6 +288,9 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Thu May 21 2026 Michal Ruprich <mruprich@redhat.com> - 8.5.3-13
+- Resolves: RHEL-174677 - denial of service via crafted FlowSpec component
+
 * Fri Jan 16 2026 Michal Ruprich <mruprich@redhat.com> - 8.5.3-12
 - Resolves: RHEL-137180 - Files under /var are not properly created in image-mode
 

@@ -7,7 +7,7 @@
 
 Name: frr
 Version: 7.5.1
-Release: 24%{?checkout}%{?dist}
+Release: 25%{?checkout}%{?dist}
 Summary: Routing daemon
 License: GPLv2+
 URL: http://www.frrouting.org
@@ -70,6 +70,8 @@ Patch0027: 0027-dynamic-netlink-buffer.patch
 Patch0028: 0028-vtysh-in-namespaces.patch
 # https://github.com/FRRouting/frr/commit/0e6882bc72c0278988a47b2f0f73b7a91099a25c
 Patch0029: RHEL-174676.patch
+# https://github.com/FRRouting/frr/commit/7676cad65114aa23adde583d91d9d29e2debd045
+Patch0030: 0030-CVE-2026-37460.patch
 
 %description
 FRRouting is free software that manages TCP/IP based routing protocols. It takes
@@ -290,6 +292,10 @@ make check PYTHON=%{__python3}
 %endif
 
 %changelog
+* Fri Jul 10 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 7.5.1-25
+- Fix EVPN and ENCAP/VNC packet parsing validation (CVE-2026-37460)
+- Resolves: RHEL-193233
+
 * Wed May 20 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 7.5.1-24
 - Fix off-by-one error in FlowSpec operator array bounds checking (CVE-2026-37457)
 - Resolves: RHEL-174676
